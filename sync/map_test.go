@@ -211,3 +211,44 @@ func BenchmarkHardCodeDefer(b *testing.B) {
 		sum += m.Get(k).(int)
 	}
 }
+
+/**********************************************/
+type testObject struct {
+	Id   int
+	Name string
+}
+
+type hardCodeObjectMap struct {
+	sync.RWMutex
+	m map[testObject]interface{}
+}
+
+func (h *hardCodeObjectMap) Get(key testObject) (v interface{}) {
+	h.RLock()
+	v = h.m[key]
+	defer h.RUnlock()
+	return
+}
+
+func BenchmarkHardCodeObjectMap(b *testing.B) {
+	m := hardCodeObjectMap{}
+	m.m = map[testObject]interface{}{}
+	kk := testObject{1, "name"}
+	m.m[kk] = 1
+
+	var sum int
+	for i := 0; i < b.N; i++ {
+		sum += m.Get(kk).(int)
+	}
+}
+
+func BenchmarkHardCodeObjectMap1(b *testing.B) {
+	m := Map{}
+	kk := testObject{1, "name"}
+	m.Set(kk, 1)
+
+	var sum int
+	for i := 0; i < b.N; i++ {
+		sum += m.Get(kk).(int)
+	}
+}
