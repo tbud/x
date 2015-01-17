@@ -9,11 +9,11 @@ type Map struct {
 	m map[interface{}]interface{}
 }
 
-func (m *Map) Get(key interface{}) interface{} {
+func (m *Map) Get(key interface{}) (v interface{}) {
 	m.RLock()
-	defer m.RUnlock()
-
-	return m.m[key]
+	v = m.m[key]
+	m.RUnlock()
+	return
 }
 
 func (m *Map) GetOrElse(key interface{}, f func() (interface{}, error), defaultValue interface{}) interface{} {
@@ -44,17 +44,17 @@ func (m *Map) GetOrElse(key interface{}, f func() (interface{}, error), defaultV
 }
 
 func (m *Map) Set(key, value interface{}) bool {
-	m.Lock()
-	defer m.Unlock()
+	m.RLock()
+	v, ok := m.m[key]
+	m.RUnlock()
 
-	if m.m == nil {
-		m.m = map[interface{}]interface{}{}
-	}
-
-	if v, ok := m.m[key]; !ok {
+	if !ok || value != v {
+		m.Lock()
+		if m.m == nil {
+			m.m = map[interface{}]interface{}{}
+		}
 		m.m[key] = value
-	} else if value != v {
-		m.m[key] = value
+		m.Unlock()
 	} else {
 		return false
 	}

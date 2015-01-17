@@ -1,8 +1,11 @@
 package sync
 
 import (
+	"sync"
 	"testing"
 )
+
+const k = "ttt"
 
 func TestMapBehavior(t *testing.T) {
 	m := Map{}
@@ -30,7 +33,6 @@ func TestMapBehavior(t *testing.T) {
 
 func TestNewMap(t *testing.T) {
 	m := Map{}
-	k := "ttt"
 
 	if r := m.Get(k); r != nil {
 		t.Errorf("want nil get: %v ", r)
@@ -73,4 +75,110 @@ func TestGetOrElse(t *testing.T) {
 	if v := m.GetOrElse("222", func() (interface{}, error) { return sum(1, 2), nil }, 100); v != 3 {
 		t.Errorf("want 3, but get: %v", v)
 	}
+}
+
+/****************************************************/
+func BenchmarkOriginMap(b *testing.B) {
+	m := map[string]int{}
+	m[k] = 1
+	var sum int
+	for i := 0; i < b.N; i++ {
+		sum += m[k]
+	}
+}
+
+type hardCodeMap struct {
+	sync.RWMutex
+	m map[string]int
+}
+
+func (h *hardCodeMap) Get(key string) (v int) {
+	h.RLock()
+	v = h.m[key]
+	h.RUnlock()
+	return
+}
+
+func BenchmarkHardCodeMap(b *testing.B) {
+	m := hardCodeMap{}
+	m.m = map[string]int{}
+	m.m[k] = 1
+
+	var sum int
+	for i := 0; i < b.N; i++ {
+		m.RLock()
+		v := m.m[k]
+		m.RUnlock()
+		sum += v
+	}
+}
+
+func BenchmarkHardCodeGet(b *testing.B) {
+	h := hardCodeMap{}
+	h.m = map[string]int{}
+	h.m[k] = 1
+
+	var sum int
+	for i := 0; i < b.N; i++ {
+		sum += h.Get(k)
+	}
+}
+
+func BenchmarkSyncMap(b *testing.B) {
+	m := Map{}
+	m.m = map[interface{}]interface{}{}
+	m.m[k] = 1
+
+	var sum int
+	for i := 0; i < b.N; i++ {
+		sum += m.Get(k).(int)
+	}
+}
+
+type hardCodeInfKeyMap struct {
+	sync.RWMutex
+	m map[interface{}]int
+}
+
+func (h *hardCodeInfKeyMap) Get(key interface{}) (v int) {
+	h.RLock()
+	v = h.m[key]
+	h.RUnlock()
+	return
+}
+
+func BenchmarkHardCodeInfKey(b *testing.B) {
+	m := hardCodeInfKeyMap{}
+	m.m = map[interface{}]int{}
+	m.m[k] = 1
+
+	var sum int
+	for i := 0; i < b.N; i++ {
+		sum += m.Get(k)
+	}
+
+}
+
+type hardCodeInfValMap struct {
+	sync.RWMutex
+	m map[string]interface{}
+}
+
+func (h *hardCodeInfValMap) Get(key string) (v interface{}) {
+	h.RLock()
+	v = h.m[key]
+	h.RUnlock()
+	return
+}
+
+func BenchmarkHardCodeInfVal(b *testing.B) {
+	m := hardCodeInfValMap{}
+	m.m = map[string]interface{}{}
+	m.m[k] = 1
+
+	var sum int
+	for i := 0; i < b.N; i++ {
+		sum += m.Get(k).(int)
+	}
+
 }
