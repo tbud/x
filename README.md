@@ -1,3 +1,3 @@
-# earth
+# bud
 
-A go library for tbud web framework.
+Aim to build a light full stack framework.
