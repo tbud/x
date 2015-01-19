@@ -39,10 +39,6 @@ func ValidateMeta(t reflect.Type) ([]MetaInfo, error) {
 	return meta(t, validateTag)
 }
 
-func JsonMetaTypeName(name string) string {
-	return nameStrategy[jsonTag](name)
-}
-
 type metaCache struct {
 	sync.RWMutex
 	m map[reflect.Type][]MetaInfo
@@ -133,6 +129,19 @@ func meta(t reflect.Type, tagName string) (retMeta []MetaInfo, err error) {
 		})
 
 		metaFromTag(t, tagName, ms)
+
+		// copy from json encode and remove from json encode
+		for i := 0; i < t.NumField(); i++ {
+			sf := t.Field(i)
+			ft := sf.Type
+			if ft.Name() == "" && ft.Kind() == reflect.Ptr {
+				// Follow pointer.
+				ft = ft.Elem()
+			}
+			if len(ms[i].Name) == 0 && (!sf.Anonymous || ft.Kind() != reflect.Struct) {
+				ms[i].Name = nameStrategy[tagName](t.Field(i).Name)
+			}
+		}
 
 		return ms
 	})

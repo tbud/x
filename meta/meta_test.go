@@ -7,7 +7,7 @@ import (
 
 type MetaInfoTest struct {
 	MetaTag  int    `@:"metaSymbol,123,441"`
-	JsonTag  string `@:"fdsa",json:"tt"`
+	JsonTag  string `@:"fdsa" json:"tt"`
 	EmptyTag string
 }
 
@@ -21,7 +21,7 @@ func TestJsonMeta(t *testing.T) {
 
 	want := []MetaInfo{
 		MetaInfo{Name: "metaSymbol", Tagged: true},
-		MetaInfo{Name: "fdsa", Tagged: true},
+		MetaInfo{Name: "tt", Tagged: true},
 		MetaInfo{Name: "emptyTag"},
 	}
 

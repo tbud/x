@@ -1054,14 +1054,11 @@ func typeFields(t reflect.Type) []field {
 				}
 
 				// Record found field and index sequence.
-				if name != "" || !sf.Anonymous || ft.Kind() != reflect.Struct {
-					tagged := name != ""
-					if name == "" {
-						name = meta.JsonMetaTypeName(sf.Name)
-					}
+				// if name != "" || !sf.Anonymous || ft.Kind() != reflect.Struct {
+				if name != "" {
 					fields = append(fields, fillField(field{
 						name:      name,
-						tag:       tagged,
+						tag:       metaInfo.Tagged,
 						index:     index,
 						typ:       ft,
 						omitEmpty: metaInfo.OmitEmpty,
