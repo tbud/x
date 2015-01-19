@@ -10,6 +10,7 @@ import (
 
 type MetaInfo struct {
 	Name          string
+	Tagged        bool
 	Min           int
 	Max           int
 	Skip          bool
@@ -36,6 +37,10 @@ func OrmMeta(t reflect.Type) ([]MetaInfo, error) {
 
 func ValidateMeta(t reflect.Type) ([]MetaInfo, error) {
 	return meta(t, validateTag)
+}
+
+func JsonMetaTypeName(name string) string {
+	return nameStrategy[jsonTag](name)
 }
 
 type metaCache struct {
@@ -122,18 +127,24 @@ func meta(t reflect.Type, tagName string) (retMeta []MetaInfo, err error) {
 
 	retMeta = metaCaches[tagName].getOrElse(t, func() []MetaInfo {
 		ms := metaCaches[metaTag].getOrElse(t, func() []MetaInfo {
-			metaInfos := make([]MetaInfo, metaTp.NumField())
+			metaInfos := make([]MetaInfo, t.NumField())
 			metaFromTag(t, metaTag, metaInfos)
 			return metaInfos
 		})
 
 		metaFromTag(t, tagName, ms)
 
-		for i := 0; i < t.NumField(); i++ {
-			if len(ms[i].Name) == 0 {
-				ms[i].Name = nameStrategy[tagName](t.Field(i).Name)
-			}
-		}
+		// for i := 0; i < t.NumField(); i++ {
+		// 	sf := t.Field(i)
+		// 	ft := sf.Type
+		// 	if ft.Name() == "" && ft.Kind() == reflect.Ptr {
+		// 		// Follow pointer.
+		// 		ft = ft.Elem()
+		// 	}
+		// 	if len(ms[i].Name) == 0 && (!sf.Anonymous || ft.Kind() != reflect.Struct) {
+		// 		ms[i].Name = nameStrategy[tagName](t.Field(i).Name)
+		// 	}
+		// }
 
 		return ms
 	})
@@ -147,17 +158,22 @@ func metaFromTag(t reflect.Type, tagName string, metaInfos []MetaInfo) {
 		tag := field.Tag.Get(tagName)
 		meta := &metaInfos[i]
 
+		nameSeted := false
 		if len(tag) > 0 {
+			meta.Tagged = true
 			for _, v := range strings.Split(tag, ",") {
 				switch {
+				case len(v) <= 0:
+					continue
 				case v == "-":
 					meta.Skip = true
 				case v == "~" || v == "omitempty":
 					meta.OmitEmpty = true
 				case v == "string" || v == "%q":
 					meta.Quote = true
-				case unicode.IsLetter([]rune(v)[0]):
+				case unicode.IsLetter([]rune(v)[0]) && !nameSeted:
 					meta.Name = v
+					nameSeted = true
 				}
 			}
 		}

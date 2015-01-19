@@ -20,9 +20,28 @@ func TestJsonMeta(t *testing.T) {
 	}
 
 	want := []MetaInfo{
-		MetaInfo{Name: "metaSymbol"},
-		MetaInfo{Name: "fdsa"},
+		MetaInfo{Name: "metaSymbol", Tagged: true},
+		MetaInfo{Name: "fdsa", Tagged: true},
 		MetaInfo{Name: "emptyTag"},
+	}
+
+	for i := 0; i < len(mi); i++ {
+		if r, w := mi[i], want[i]; r != w {
+			t.Errorf("want %v, get %v", w, r)
+		}
+	}
+}
+
+func TestOrmMeta(t *testing.T) {
+	mi, ok := OrmMeta(metaTp)
+	if ok != nil {
+		t.Errorf("test json meta get a error: %v", ok)
+	}
+
+	want := []MetaInfo{
+		MetaInfo{Name: "metaSymbol", Tagged: true},
+		MetaInfo{Name: "fdsa", Tagged: true},
+		MetaInfo{Name: "empty_tag"},
 	}
 
 	for i := 0; i < len(mi); i++ {
