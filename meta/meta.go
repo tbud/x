@@ -171,7 +171,7 @@ func metaFromTag(t reflect.Type, tagName string, metaInfos []MetaInfo) {
 					meta.OmitEmpty = true
 				case v == "string" || v == "%q":
 					meta.Quote = true
-				case unicode.IsLetter([]rune(v)[0]) && !nameSeted:
+				case !nameSeted:
 					meta.Name = v
 					nameSeted = true
 				}
