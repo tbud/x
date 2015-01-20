@@ -1,3 +1,3 @@
 # bud
 
-Aim to build a light full stack framework.
+Aim to build a light full stack tools.
