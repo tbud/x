@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"github.com/tbud/bud"
 	"go/build"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 var cmdNew = &Command{
+	Run:       newCommand,
 	UsageLine: "new [path] [skeleton]",
 	Short:     "create a skeleton Bud application",
 	Long: `
@@ -27,18 +30,12 @@ For example:
 	`,
 }
 
-func init() {
-	cmdNew.Run = newCommand
-}
-
 var (
 	// go related paths
 	gopath  string
-	gocmd   string
 	srcRoot string
 
 	// bud related paths
-	budPkg       *build.Package
 	appPath      string
 	appName      string
 	basePath     string
@@ -54,14 +51,13 @@ func newCommand(cmd *Command, args []string) {
 		fatalf("Too many arguments provided.\nRun 'bud help new' for usage.\n")
 	}
 
-	// checking and setting go paths
-	initGoPaths()
+	checkGoPaths()
 
 	// checking and setting application
 	setApplicationPath(args)
 
 	// checking and setting skeleton
-	setSkeletonPath(args)
+	checkSkeletonPath(args)
 
 	// copy files to new app directory
 	copyNewAppFiles()
@@ -71,7 +67,7 @@ func newCommand(cmd *Command, args []string) {
 }
 
 // lookup and set Go related variables
-func initGoPaths() {
+func checkGoPaths() {
 	// lookup go path
 	gopath = build.Default.GOPATH
 	if gopath == "" {
@@ -81,13 +77,6 @@ func initGoPaths() {
 
 	// set go src path
 	srcRoot = filepath.Join(filepath.SplitList(gopath)[0], "src")
-
-	// check for go executable
-	var err error
-	gocmd, err = exec.LookPath("go")
-	if err != nil {
-		fatalf("Go executable not found in PATH.")
-	}
 }
 
 func setApplicationPath(args []string) {
@@ -101,11 +90,6 @@ func setApplicationPath(args []string) {
 	_, err = build.Import(importPath, "", build.FindOnly)
 	if err == nil {
 		fatalf("Abort: Import path %s already exists.\n", importPath)
-	}
-
-	budPkg, err = build.Import(bud.BUD_IMPORT_PATH, "", build.FindOnly)
-	if err != nil {
-		fatalf("Abort: Could not find bud source code: %s\n", err)
 	}
 
 	appPath = filepath.Join(srcRoot, filepath.FromSlash(importPath))
@@ -123,29 +107,44 @@ func setApplicationPath(args []string) {
 	}
 }
 
-func setSkeletonPath(args []string) {
-	var err error
+func checkSkeletonPath(args []string) {
 	if len(args) == 2 { // user specified
 		skeletonName := args[1]
-		_, err = build.Import(skeletonName, "", build.FindOnly)
-		if err != nil {
-			// Execute "go get <pkg>"
-			getCmd := exec.Command(gocmd, "get", "-d", skeletonName)
-			logf("Exec: %s", getCmd.Args)
-			bOutput, err := getCmd.CombinedOutput()
 
-			bpos := bytes.Index(bOutput, []byte("no buildable Go source files in"))
-			if err != nil && bpos == -1 {
-				fatalf("Abort: Could not find or 'go get' Skeleton  source code: %s\n%s\n", bOutput, skeletonName)
-			}
+		if strings.Index(skeletonName, string(os.PathSeparator)) == -1 {
+			skeletonPath = filepath.Join(bud.BUD_SKELETON_PATH, skeletonName)
+		} else {
+			skeletonPath = filepath.Join(srcRoot, skeletonName)
 		}
-
-		skeletonPath = filepath.Join(srcRoot, skeletonName)
 	} else {
-		skeletonPath = filepath.Join(budPkg.Dir, "skeleton")
+		skeletonPath = filepath.Join(bud.BUD_SKELETON_PATH, "default")
 	}
+
+	checkAndGetImport(skeletonPath)
 }
 
 func copyNewAppFiles() {
+	// err := os.MkdirAll(appPath, 0777)
+	// if err != nil {
+	// 	fatalf(format, ...)
+	// }
+}
 
+func checkAndGetImport(path string) {
+	gocmd, err := exec.LookPath("go")
+	if err != nil {
+		fatalf("Go executable not found in PATH.")
+	}
+
+	_, err = build.Import(path, "", build.FindOnly)
+	if err != nil {
+		getCmd := exec.Command(gocmd, "get", "-d", path)
+		logf("Exec: %s", getCmd.Args)
+		bOutput, err := getCmd.CombinedOutput()
+
+		bpos := bytes.Index(bOutput, []byte("no buildable Go source files in"))
+		if err != nil && bpos == -1 {
+			fatalf("Abort: Could not find or 'go get' path '%s'.\nOutput: %s", path, bOutput)
+		}
+	}
 }
