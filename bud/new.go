@@ -4,44 +4,48 @@ import (
 	"bytes"
 	"github.com/tbud/bud"
 	"go/build"
+	"io"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"text/template"
+	"time"
 )
 
 var cmdNew = &Command{
 	Run:       newCommand,
-	UsageLine: "new [path] [skeleton]",
-	Short:     "create a skeleton Bud application",
+	UsageLine: "new [path] [archetype]",
+	Short:     "create a archetype Bud application",
 	Long: `
 New creates a few files to get a new bud application running quickly.
 
 It puts all of the files in the given import path, taking the final element in
 the path to be the app name.
 
-Skeleton is an optional argument, provided as an import path
+archetype is an optional argument, provided as an import path
 
 For example:
 
     bud new import/path/helloworld
 
-    bud new import/path/helloworld import/path/skeleton
+    bud new import/path/helloworld import/path/archetype
 	`,
 }
 
 var (
-	// go related paths
-	gopath  string
-	srcRoot string
-
-	// bud related paths
-	appPath      string
-	appName      string
-	basePath     string
-	importPath   string
-	skeletonPath string
+	srcRoot       string
+	appPath       string
+	appName       string
+	basePath      string
+	importPath    string
+	archetypePath string
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 func newCommand(cmd *Command, args []string) {
 	if len(args) == 0 {
@@ -56,20 +60,35 @@ func newCommand(cmd *Command, args []string) {
 	// checking and setting application
 	setApplicationPath(args)
 
-	// checking and setting skeleton
-	checkSkeletonPath(args)
+	// checking and setting archetype
+	checkArchetypePath(args)
 
 	// copy files to new app directory
-	copyNewAppFiles()
+	copyAppSkeletonDir(appPath, archetypePath, map[string]interface{}{
+		"AppName":  appName,
+		"BasePath": basePath,
+		"Secret":   generateSecret(),
+	})
 
 	logf("Your application is ready:\n  %s", appPath)
 	logf("\nYou can run it with:\n  bud run %s", importPath)
 }
 
+const alphaNumeric = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+
+func generateSecret() string {
+	chars := make([]byte, 64)
+	for i := 0; i < 64; i++ {
+		chars[i] = alphaNumeric[rand.Intn(len(alphaNumeric))]
+	}
+
+	return string(chars)
+}
+
 // lookup and set Go related variables
 func checkGoPaths() {
 	// lookup go path
-	gopath = build.Default.GOPATH
+	gopath := build.Default.GOPATH
 	if gopath == "" {
 		fatalf("Abort: GOPATH environment variable is not set. " +
 			"Please refer to http://golang.org/doc/code.html to configure your Go environment.")
@@ -107,27 +126,25 @@ func setApplicationPath(args []string) {
 	}
 }
 
-func checkSkeletonPath(args []string) {
-	if len(args) == 2 { // user specified
-		skeletonName := args[1]
+func checkArchetypePath(args []string) {
+	archetypeName := "default"
+	bUsebud := true
 
-		if strings.Index(skeletonName, string(os.PathSeparator)) == -1 {
-			skeletonPath = filepath.Join(bud.BUD_SKELETON_PATH, skeletonName)
-		} else {
-			skeletonPath = filepath.Join(srcRoot, skeletonName)
-		}
-	} else {
-		skeletonPath = filepath.Join(bud.BUD_SKELETON_PATH, "default")
+	if len(args) == 2 {
+		archetypeName = args[1]
+		bUsebud = strings.Index(archetypeName, string(os.PathSeparator)) == -1
 	}
 
-	checkAndGetImport(skeletonPath)
-}
+	if bUsebud {
+		budArchetypePath, err := build.Import(bud.BUD_ARCHETYPE_PATH, "", build.FindOnly)
+		panicOnError(err, "import bud archetype path error:%s", bud.BUD_ARCHETYPE_PATH)
 
-func copyNewAppFiles() {
-	// err := os.MkdirAll(appPath, 0777)
-	// if err != nil {
-	// 	fatalf(format, ...)
-	// }
+		checkAndGetImport(bud.BUD_ARCHETYPE_PATH)
+		archetypePath = filepath.Join(budArchetypePath.Dir, archetypeName)
+	} else {
+		checkAndGetImport(archetypeName)
+		archetypePath = filepath.Join(srcRoot, archetypeName)
+	}
 }
 
 func checkAndGetImport(path string) {
@@ -147,4 +164,81 @@ func checkAndGetImport(path string) {
 			fatalf("Abort: Could not find or 'go get' path '%s'.\nOutput: %s", path, bOutput)
 		}
 	}
+}
+
+func copyAppSkeletonDir(destDir, srcDir string, data map[string]interface{}) error {
+	var originSrcDir string
+	// check skeleton dir wether or not a link
+	fi, err := os.Lstat(srcDir)
+	if err == nil && fi.Mode()&os.ModeSymlink == os.ModeSymlink {
+		originSrcDir, err = os.Readlink(srcDir)
+		panicOnError(err, "Read link err %s", srcDir)
+	} else {
+		originSrcDir = srcDir
+	}
+
+	// check skeleton dir is exist
+	skeletonDir := filepath.Join(originSrcDir, "skeleton")
+	if _, err := os.Stat(skeletonDir); err != nil {
+		if os.IsNotExist(err) {
+			fatalf("Skeleton not exist: %s", skeletonDir)
+		}
+	}
+
+	err = os.MkdirAll(appPath, 0777)
+	panicOnError(err, "Failed to create directory: %s", appPath)
+
+	return filepath.Walk(skeletonDir, func(path string, info os.FileInfo, err error) error {
+		relSrcPath := strings.TrimLeft(path[len(skeletonDir):], string(os.PathSeparator))
+		destPath := filepath.Join(destDir, relSrcPath)
+
+		if strings.HasPrefix(relSrcPath, ".") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+		}
+
+		if info.IsDir() {
+			err = os.MkdirAll(destPath, 0777)
+			if !os.IsNotExist(err) {
+				panicOnError(err, "Failed to create directory: %s", destPath)
+			}
+			return nil
+		}
+
+		if strings.HasSuffix(relSrcPath, ".template") {
+			copyTemplateFile(destPath[:len(destPath)-len(".template")], path, data)
+			return nil
+		}
+
+		copyFile(destPath, path)
+		return nil
+	})
+}
+
+func copyFile(destFile, srcFile string) {
+	dst, err := os.Create(destFile)
+	panicOnError(err, "Failed to create file: %s, %s", destFile, err)
+
+	src, err := os.Open(srcFile)
+	panicOnError(err, "Failed to open file: %s, %s", srcFile, err)
+
+	_, err = io.Copy(dst, src)
+	panicOnError(err, "Failed to copy data from %s to %s with err: %s", dst.Name(), src.Name(), err)
+
+	panicOnError(src.Close(), "Failed to close file %s", src.Name())
+
+	panicOnError(dst.Close(), "Failed to close file %s", dst.Name())
+}
+
+func copyTemplateFile(destFile, srcFile string, data map[string]interface{}) {
+	temp, err := template.ParseFiles(srcFile)
+	panicOnError(err, "Failed to parse template %s", srcFile)
+
+	dst, err := os.Create(destFile)
+	panicOnError(err, "Failed to create file %s", dst.Name())
+
+	panicOnError(temp.Execute(dst, data), "Failed to render template %s", srcFile)
+
+	panicOnError(dst.Close(), "Failed to close file %s", dst.Name())
 }
