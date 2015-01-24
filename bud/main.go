@@ -135,7 +135,7 @@ func main() {
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "go: unknown subcommand %q\nRun 'go help' for usage.\n", args[0])
+	fmt.Fprintf(os.Stderr, "bud: unknown subcommand %q\nRun 'bud help' for usage.\n", args[0])
 	setExitStatus(2)
 	exit()
 }
@@ -150,22 +150,22 @@ The commands are:
 {{range .}}{{if .Runnable}}
     {{.Name | printf "%-11s"}} {{.Short}}{{end}}{{end}}
 
-Use "go help [command]" for more information about a command.
+Use "bud help [command]" for more information about a command.
 
 Additional help topics:
 {{range .}}{{if not .Runnable}}
     {{.Name | printf "%-11s"}} {{.Short}}{{end}}{{end}}
 
-Use "go help [topic]" for more information about that topic.
+Use "bud help [topic]" for more information about that topic.
 
 `
 
-var helpTemplate = `{{if .Runnable}}usage: go {{.UsageLine}}
+var helpTemplate = `{{if .Runnable}}usage: bud {{.UsageLine}}
 
 {{end}}{{.Long | trim}}
 `
 
-var documentationTemplate = `// Copyright 2011 The Go Authors.  All rights reserved.
+var documentationTemplate = `// Copyright 2011 The Bud Authors.  All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -177,7 +177,7 @@ var documentationTemplate = `// Copyright 2011 The Go Authors.  All rights reser
 
 {{end}}{{if .Runnable}}Usage:
 
-	go {{.UsageLine}}
+	bud {{.UsageLine}}
 
 {{end}}{{.Long | trim}}
 
@@ -222,17 +222,17 @@ func usage() {
 func help(args []string) {
 	if len(args) == 0 {
 		printUsage(os.Stdout)
-		// not exit 2: succeeded at 'go help'.
+		// not exit 2: succeeded at 'bud help'.
 		return
 	}
 	if len(args) != 1 {
-		fmt.Fprintf(os.Stderr, "usage: go help command\n\nToo many arguments given.\n")
-		os.Exit(2) // failed at 'go help'
+		fmt.Fprintf(os.Stderr, "usage: bud help command\n\nToo many arguments given.\n")
+		os.Exit(2) // failed at 'bud help'
 	}
 
 	arg := args[0]
 
-	// 'go help documentation' generates doc.go.
+	// 'bud help documentation' generates doc.go.
 	if arg == "documentation" {
 		buf := new(bytes.Buffer)
 		printUsage(buf)
@@ -244,13 +244,13 @@ func help(args []string) {
 	for _, cmd := range commands {
 		if cmd.Name() == arg {
 			tmpl(os.Stdout, helpTemplate, cmd)
-			// not exit 2: succeeded at 'go help cmd'.
+			// not exit 2: succeeded at 'bud help cmd'.
 			return
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "Unknown help topic %#q.  Run 'go help'.\n", arg)
-	os.Exit(2) // failed at 'go help cmd'
+	fmt.Fprintf(os.Stderr, "Unknown help topic %#q.  Run 'bud help'.\n", arg)
+	os.Exit(2) // failed at 'bud help cmd'
 }
 
 // importPathsNoDotExpansion returns the import paths to use for the given
