@@ -15,60 +15,52 @@ import (
 )
 
 var cmdNew = &Command{
-	Run:       newCommand,
-	UsageLine: "new [path] [archetype]",
-	Short:     "create a archetype Bud application",
+	UsageLine: "new [-s] [path]",
+	Short:     "create a bud application from seed",
 	Long: `
 New creates a few files to get a new bud application running quickly.
 
-It puts all of the files in the given import path, taking the final element in
+It puts all of the files in the given path, taking the final element in
 the path to be the app name.
 
-archetype is an optional argument, provided as an import path
+The -s flag is an optional argument, provided the ability to create from a special seed.
+The default seed is react.
 
 For example:
 
-    bud new import/path/helloworld
+    bud new import/path/appname
 
-    bud new import/path/helloworld import/path/archetype
-	`,
+    bud new -s react import/path/appname
+    `,
 }
 
+var seedName = cmdNew.Flag.String("s", "react", "")
+
 var (
-	srcRoot       string
-	appPath       string
-	appName       string
-	basePath      string
-	importPath    string
-	archetypePath string
+	srcRoot    string
+	appPath    string
+	appName    string
+	basePath   string
+	importPath string
 )
 
 func init() {
+	cmdNew.Run = newCommand
 	rand.Seed(time.Now().UnixNano())
 }
 
 func newCommand(cmd *Command, args []string) {
-	if len(args) == 0 {
-		fatalf("No import path given.\nRun 'bud help new' for usage.\n")
-	}
-	if len(args) > 2 {
-		fatalf("Too many arguments provided.\nRun 'bud help new' for usage.\n")
+	if len(args) != 1 {
+		fatalf("Command error. Run 'bud help new' for usage.\n")
 	}
 
 	checkGoPaths()
 
 	// checking and setting application
-	setApplicationPath(args)
+	parseParams(args)
 
-	// checking and setting archetype
-	checkArchetypePath(args)
-
-	// copy files to new app directory
-	copyAppSkeletonDir(appPath, archetypePath, map[string]interface{}{
-		"AppName":  appName,
-		"BasePath": basePath,
-		"Secret":   generateSecret(),
-	})
+	// checking and copy from seed
+	copyFromSeed()
 
 	logf("Your application is ready:\n  %s", appPath)
 	logf("\nYou can run it with:\n  bud run %s", importPath)
@@ -98,7 +90,7 @@ func checkGoPaths() {
 	srcRoot = filepath.Join(filepath.SplitList(gopath)[0], "src")
 }
 
-func setApplicationPath(args []string) {
+func parseParams(args []string) {
 	var err error
 	importPath = args[0]
 	if filepath.IsAbs(importPath) {
@@ -126,25 +118,27 @@ func setApplicationPath(args []string) {
 	}
 }
 
-func checkArchetypePath(args []string) {
-	archetypeName := "default"
-	bUsebud := true
+func copyFromSeed() {
+	var seedPath string
+	if strings.Index(*seedName, string(os.PathSeparator)) == -1 {
+		checkAndGetImport(bud.BUD_SEED_PATH)
 
-	if len(args) == 2 {
-		archetypeName = args[1]
-		bUsebud = strings.Index(archetypeName, string(os.PathSeparator)) == -1
-	}
+		budSeedPath, err := build.Import(bud.BUD_SEED_PATH, "", build.FindOnly)
+		panicOnError(err, "import bud seed path error:%s", bud.BUD_SEED_PATH)
 
-	if bUsebud {
-		budArchetypePath, err := build.Import(bud.BUD_ARCHETYPE_PATH, "", build.FindOnly)
-		panicOnError(err, "import bud archetype path error:%s", bud.BUD_ARCHETYPE_PATH)
-
-		checkAndGetImport(bud.BUD_ARCHETYPE_PATH)
-		archetypePath = filepath.Join(budArchetypePath.Dir, archetypeName)
+		seedPath = filepath.Join(budSeedPath.Dir, *seedName)
 	} else {
-		checkAndGetImport(archetypeName)
-		archetypePath = filepath.Join(srcRoot, archetypeName)
+		checkAndGetImport(*seedName)
+		seedPath = filepath.Join(srcRoot, *seedName)
 	}
+
+	// copy files to new app directory
+	copySeedArchetype(appPath, seedPath, map[string]interface{}{
+		"AppName":  appName,
+		"BasePath": basePath,
+		"Secret":   generateSecret(),
+	})
+
 }
 
 func checkAndGetImport(path string) {
@@ -166,9 +160,9 @@ func checkAndGetImport(path string) {
 	}
 }
 
-func copyAppSkeletonDir(destDir, srcDir string, data map[string]interface{}) error {
+func copySeedArchetype(destDir, srcDir string, data map[string]interface{}) error {
 	var originSrcDir string
-	// check skeleton dir wether or not a link
+	// check seed dir wether or not a link
 	fi, err := os.Lstat(srcDir)
 	if err == nil && fi.Mode()&os.ModeSymlink == os.ModeSymlink {
 		originSrcDir, err = os.Readlink(srcDir)
@@ -177,19 +171,19 @@ func copyAppSkeletonDir(destDir, srcDir string, data map[string]interface{}) err
 		originSrcDir = srcDir
 	}
 
-	// check skeleton dir is exist
-	skeletonDir := filepath.Join(originSrcDir, "skeleton")
-	if _, err := os.Stat(skeletonDir); err != nil {
+	// check seed archetype dir is exist
+	archetypeDir := filepath.Join(originSrcDir, "archetype")
+	if _, err := os.Stat(archetypeDir); err != nil {
 		if os.IsNotExist(err) {
-			fatalf("Skeleton not exist: %s", skeletonDir)
+			fatalf("Seed archetype not exist: %s", archetypeDir)
 		}
 	}
 
 	err = os.MkdirAll(appPath, 0777)
 	panicOnError(err, "Failed to create directory: %s", appPath)
 
-	return filepath.Walk(skeletonDir, func(path string, info os.FileInfo, err error) error {
-		relSrcPath := strings.TrimLeft(path[len(skeletonDir):], string(os.PathSeparator))
+	return filepath.Walk(archetypeDir, func(path string, info os.FileInfo, err error) error {
+		relSrcPath := strings.TrimLeft(path[len(archetypeDir):], string(os.PathSeparator))
 		destPath := filepath.Join(destDir, relSrcPath)
 
 		if strings.HasPrefix(relSrcPath, ".") {
