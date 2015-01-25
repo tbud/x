@@ -14,7 +14,7 @@ import (
 	"bytes"
 	"encoding"
 	"encoding/base64"
-	"github.com/tbud/base/meta"
+	"github.com/tbud/bud/meta"
 	"math"
 	"reflect"
 	"runtime"

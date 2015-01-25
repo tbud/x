@@ -1,6 +1,12 @@
 package bud
 
-const (
-	BUD_IMPORT_PATH = "github.com/tbud/bud"
-	BUD_SEED_PATH   = "github.com/tbud/seed"
+import (
+	"io/ioutil"
+	"log"
 )
+
+const (
+	BUD_SEED_PATH = "github.com/tbud/seed"
+)
+
+var ()
