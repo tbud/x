@@ -1,5 +1,9 @@
 package main
 
+import (
+	"github.com/tbud/bud/embryo"
+)
+
 var cmdRun = &Command{
 	Run:       runCommand,
 	UsageLine: "run [import path] [run mode] [port]",
@@ -27,9 +31,7 @@ func runCommand(cmd *Command, args []string) {
 		fatalf("No import path given.\nRun 'bud help run' for usage.\n")
 	}
 
-	// mode := "dev"
-	// if len(args) >= 2 {
-	// 	mode = args[1]
-	// }
+	emb := embryo.New()
 
+	emb.Run()
 }

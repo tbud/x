@@ -1,12 +1,14 @@
 package bud
 
 import (
-	"io/ioutil"
-	"log"
+	"github.com/tbud/bud/log"
+	"os"
 )
 
 const (
 	BUD_SEED_PATH = "github.com/tbud/seed"
 )
 
-var ()
+var (
+	ErrLog = log.New(os.Stderr, "[E]")
+)
