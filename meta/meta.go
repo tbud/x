@@ -22,10 +22,15 @@ type MetaInfo struct {
 
 const (
 	metaTag     = "@"
+	hoconTag    = "hocon"
 	jsonTag     = "json"
 	ormTag      = "orm"
 	validateTag = "validate"
 )
+
+func HoconMeta(t reflect.Type) ([]MetaInfo, error) {
+	return meta(t, hoconTag)
+}
 
 func JsonMeta(t reflect.Type) ([]MetaInfo, error) {
 	return meta(t, jsonTag)
@@ -106,6 +111,7 @@ func underscoreLittleName(name string) string {
 }
 
 var nameStrategy = map[string]func(string) string{
+	hoconTag:    firstLittleName,
 	jsonTag:     firstLittleName,
 	ormTag:      underscoreLittleName,
 	validateTag: originName,

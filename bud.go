@@ -1,12 +1,8 @@
-package bud
+package x
 
 import (
-	"github.com/tbud/bud/log"
+	"github.com/tbud/x/log"
 	"os"
-)
-
-const (
-	BUD_SEED_PATH = "github.com/tbud/seed"
 )
 
 var (

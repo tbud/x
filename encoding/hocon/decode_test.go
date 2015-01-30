@@ -1,9 +1,10 @@
 package hocon
 
 import (
-	"fmt"
-	"github.com/tbud/bud/encoding/json"
+	// "fmt"
+	"github.com/tbud/x/encoding/json"
 	"io/ioutil"
+	"reflect"
 	"testing"
 )
 
@@ -17,24 +18,36 @@ func getJsonMap(file string) (m interface{}, err error) {
 	return
 }
 
-func TestDecode(t *testing.T) {
-	r, err := getJsonMap("testdata/decode.json")
+func getHoconMap(file string) (m interface{}, err error) {
+	buf, err := ioutil.ReadFile(file)
 	if err != nil {
-		t.Fatalf("Get json from file %s error:%s", "testdata/decode.json", err)
+		return
 	}
 
-	m := r.(map[string]interface{})
+	err = Unmarshal(buf, &m)
+	return
+}
 
-	v, ok := m["hocon"]
-	if ok {
-		fmt.Printf("%v\n", v)
-		m := v.(map[string]interface{})
-		if v, ok := m["user"]; ok {
-			fmt.Printf("%v\n", v)
-			m := v.(map[string]interface{})
-			if v, ok := m["name"]; ok {
-				fmt.Printf("%v\n", v)
-			}
-		}
+func compareHoconAndJson(t *testing.T, hoconFile, jsonFile string) {
+	j, err := getJsonMap(jsonFile)
+	if err != nil {
+		t.Fatalf("error: %s", err)
 	}
+
+	h, err := getHoconMap(hoconFile)
+	if err != nil {
+		t.Fatalf("error: %s", err)
+	}
+
+	if !reflect.DeepEqual(h, j) {
+		t.Errorf("\n got %v\nwant %v", h, j)
+	}
+}
+
+func TestHoconSupportJson(t *testing.T) {
+	compareHoconAndJson(t, "testdata/decode.json", "testdata/decode.json")
+}
+
+func TestDecode(t *testing.T) {
+	compareHoconAndJson(t, "testdata/decode_comments.hocon", "testdata/decode.json")
 }
