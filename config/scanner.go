@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"unicode"
 )
 
@@ -86,6 +87,10 @@ type fileScanner struct {
 	dir             string         // dir of the file
 	data            []byte         // store data load from file
 	includesScanner []*fileScanner // store scanner include form current file
+	baseKeys        []string       // save base key
+	keyStack        []int          // stack for key
+	parseBuf        []rune         // save parsed key or value
+	currentState    int            // save current state
 }
 
 // These values are returned by the state transition functions
@@ -121,12 +126,15 @@ const (
 	parseObjectKey   = iota // parsing object key (before colon)
 	parseObjectValue        // parsing object value (after colon)
 	parseArrayValue         // parsing array value
+	parseKey
+	parseValue
+	parseError
 )
 
 // reset prepares the scanner for use.
 // It must be called before calling s.step.
 func (s *fileScanner) reset() {
-	s.step = stateBegin
+	s.step = stateBeginKey
 	s.parseState = s.parseState[0:0]
 	s.err = nil
 	s.redo = false
@@ -215,6 +223,34 @@ func (s *fileScanner) popParseState() {
 	}
 }
 
+func (s *fileScanner) pushKeyStack() {
+	s.keyStack = append(s.keyStack, len(s.baseKeys))
+}
+
+func (s *fileScanner) popKeyStack() {
+	if keylen := len(s.keyStack); keylen > 0 {
+		stack := s.keyStack[keylen]
+		s.baseKeys = s.baseKeys[0:stack]
+		s.keyStack = s.keyStack[0 : keylen-1]
+	}
+}
+
+func (s *fileScanner) pushKey() {
+	s.baseKeys = append(s.baseKeys, string(s.parseBuf))
+	s.parseBuf = []rune{}
+}
+
+func (s *fileScanner) pushValue() {
+	// TODO push value
+
+	if stackLen := len(s.keyStack); stackLen > 0 {
+		stack := s.keyStack[stackLen]
+		s.baseKeys = s.baseKeys[0:stack]
+	} else {
+		s.baseKeys = []string{}
+	}
+}
+
 func isSpace(c rune) bool {
 	return c == ' ' || c == '\t' || c == '\r' || c == '\n'
 }
@@ -230,35 +266,30 @@ func stateBeginValueOrEmpty(s *fileScanner, c int) int {
 	return stateBeginValue(s, c)
 }
 
-func stateBegin(s *fileScanner, c int) int {
+func stateBeginKey(s *fileScanner, c int) int {
 	if c <= ' ' && isSpace(rune(c)) {
 		return scanSkipSpace
 	}
 	switch c {
 	case '{':
-		s.step = stateBeginStringOrEmpty
-		s.pushParseState(parseObjectKey)
-		return scanBeginObject
-	case '[':
-		s.step = stateBeginValueOrEmpty
-		s.pushParseState(parseArrayValue)
-		return scanBeginArray
+		s.pushKeyStack()
+		s.step = stateBeginKey
+		return scanContinue
 	case '"':
 		s.step = stateInString
-		return scanBeginLiteral
+		s.currentState = parseKey
+		return scanContinue
 	case '#':
 		s.step = stateComment
-		return scanBeginLiteral
-	case '/':
-		s.step = stateSlashComment
-		return scanBeginLiteral
+		return scanContinue
 	case 'i':
 		s.step = stateI
+		return scanContinue
 	}
 	if unicode.IsLetter(rune(c)) {
 		s.step = stateNoQuoteString
-		s.pushParseState(parseObjectKey)
-		return scanBeginLiteral
+		s.currentState = parseKey
+		return stateNoQuoteString(s, c)
 	}
 	return s.error(c, "looking for beginning")
 }
@@ -270,41 +301,44 @@ func stateBeginValue(s *fileScanner, c int) int {
 	}
 	switch c {
 	case '{':
-		s.step = stateBeginStringOrEmpty
-		s.pushParseState(parseObjectKey)
-		return scanBeginObject
+		s.pushKeyStack()
+		s.step = stateBeginKey
+		return scanContinue
 	case '[':
 		s.step = stateBeginValueOrEmpty
 		s.pushParseState(parseArrayValue)
 		return scanBeginArray
 	case '"':
 		s.step = stateInString
-		return scanBeginLiteral
+		s.currentState = parseValue
+		return scanContinue
 	case '-':
 		s.step = stateNeg
-		return scanBeginLiteral
+		return scanContinue
 	case '0': // beginning of 0.123
 		s.step = state0
-		return scanBeginLiteral
+		return scanContinue
 	case 't': // beginning of true
 		s.step = stateT
-		return scanBeginLiteral
+		return scanContinue
 	case 'f': // beginning of false
 		s.step = stateF
-		return scanBeginLiteral
+		return scanContinue
 	case 'n': // beginning of null
 		s.step = stateN
-		return scanBeginLiteral
+		return scanContinue
 	case '#':
 		s.step = stateComment
-		return scanBeginLiteral
-	case '/':
-		s.step = stateSlashComment
-		return scanBeginLiteral
+		return scanContinue
 	}
 	if '1' <= c && c <= '9' { // beginning of 1234.5
 		s.step = state1
-		return scanBeginLiteral
+		return scanContinue
+	}
+	if unicode.IsLetter(rune(c)) {
+		s.step = stateNoQuoteString
+		s.currentState = parseValue
+		return stateNoQuoteString(s, c)
 	}
 	return s.error(c, "looking for beginning of value")
 }
@@ -337,40 +371,37 @@ func stateBeginString(s *fileScanner, c int) int {
 // stateEndValue is the state after completing a value,
 // such as after reading `{}` or `true` or `["x"`.
 func stateEndValue(s *fileScanner, c int) int {
-	n := len(s.parseState)
-	if n == 0 {
-		// Completed top-level before the current byte.
-		s.step = stateEndTop
-		s.endTop = true
-		return stateEndTop(s, c)
-	}
 	if c <= ' ' && isSpace(rune(c)) {
 		s.step = stateEndValue
 		return scanSkipSpace
 	}
-	ps := s.parseState[n-1]
-	switch ps {
-	case parseObjectKey:
+	switch s.currentState {
+	case parseKey:
 		switch c {
-		case ':':
-			s.parseState[n-1] = parseObjectValue
+		case ':', '=':
+			s.currentState = parseValue
 			s.step = stateBeginValue
-			return scanObjectKey
+			return scanContinue
 		case '.':
-			s.parseState[n-1] = parseObjectValue
-			s.step = stateBegin
-			return scanObjectKey
+			s.step = stateBeginKey
+			return scanContinue
+		case '{':
+			s.pushKeyStack()
+			s.step = stateBeginKey
+			return scanContinue
 		}
 		return s.error(c, "after object key")
-	case parseObjectValue:
-		if c == ',' {
-			s.parseState[n-1] = parseObjectKey
+	case parseValue:
+		switch c {
+		case ',', '\n':
+			if keylen := len(s.keyStack); keylen > 0 {
+
+			}
 			s.step = stateBeginString
-			return scanObjectValue
-		}
-		if c == '}' {
-			s.popParseState()
-			return scanEndObject
+			return scanContinue
+		case '}':
+			s.popKeyStack()
+			return scanContinue
 		}
 		return s.error(c, "after object key:value pair")
 	case parseArrayValue:
@@ -405,58 +436,68 @@ func stateInString(s *fileScanner, c int) int {
 		s.step = stateEndValue
 		return scanContinue
 	case c == '\\':
+		s.parseBuf = append(s.parseBuf, rune(c))
 		s.step = stateInStringEsc
 		return scanContinue
 	case c < 0x20:
 		return s.error(c, "in string literal")
 	}
 
+	s.parseBuf = append(s.parseBuf, rune(c))
 	return scanContinue
 }
 
 func stateNoQuoteString(s *fileScanner, c int) int {
-	switch c {
-	case '.':
-		s.pushParseState(parseObjectKey)
-		return scanBeginObject
-	case '=':
-		s.step = stateEndValue
-		return stateEndValue(s, c)
-	case ':':
-		s.step = stateEndValue
-		return stateEndValue(s, c)
+	if s.currentState == parseKey {
+		switch c {
+		case '.', '=', ':', '{':
+			s.parseBuf = []rune(strings.TrimRight(string(s.parseBuf), " "))
+			return stateEndValue(s, c)
+		}
 	}
+	if s.currentState == parseValue {
+		switch c {
+		case ',', '\n', '}':
+			s.parseBuf = []rune(strings.TrimRight(string(s.parseBuf), " "))
+			return stateEndValue(s, c)
+		}
+	}
+
+	switch c {
+	case '#':
+		s.step = stateComment
+		return stateEndValue(s, c)
+	case '\\':
+		s.parseBuf = append(s.parseBuf, rune(c))
+		s.step = stateInStringEsc
+		return scanContinue
+	}
+
 	if c < 0x20 {
 		return s.error(c, "in no quote string literal")
 	}
+	s.parseBuf = append(s.parseBuf, rune(c))
 	return scanContinue
 }
 
 func stateComment(s *fileScanner, c int) int {
 	if c == '\n' || c == '\r' {
-		s.step = stateBeginValue
+		s.step = stateBeginKey
 		return scanContinue
 	}
 	return scanContinue
-}
-
-func stateSlashComment(s *fileScanner, c int) int {
-	if c == '/' {
-		s.step = stateComment
-		return scanContinue
-	}
-	s.err = &SyntaxError{"invalid comment char " + quoteChar(c), s.bytes}
-	return scanError
 }
 
 // stateInStringEsc is the state after reading `"\` during a quoted string.
 func stateInStringEsc(s *fileScanner, c int) int {
 	switch c {
 	case 'b', 'f', 'n', 'r', 't', '\\', '/', '"':
+		s.parseBuf = append(s.parseBuf, rune(c))
 		s.step = stateInString
 		return scanContinue
 	}
 	if c == 'u' {
+		s.parseBuf = append(s.parseBuf, rune(c))
 		s.step = stateInStringEscU
 		return scanContinue
 	}
@@ -466,6 +507,7 @@ func stateInStringEsc(s *fileScanner, c int) int {
 // stateInStringEscU is the state after reading `"\u` during a quoted string.
 func stateInStringEscU(s *fileScanner, c int) int {
 	if '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F' {
+		s.parseBuf = append(s.parseBuf, rune(c))
 		s.step = stateInStringEscU1
 		return scanContinue
 	}
@@ -476,6 +518,7 @@ func stateInStringEscU(s *fileScanner, c int) int {
 // stateInStringEscU1 is the state after reading `"\u1` during a quoted string.
 func stateInStringEscU1(s *fileScanner, c int) int {
 	if '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F' {
+		s.parseBuf = append(s.parseBuf, rune(c))
 		s.step = stateInStringEscU12
 		return scanContinue
 	}
@@ -486,6 +529,7 @@ func stateInStringEscU1(s *fileScanner, c int) int {
 // stateInStringEscU12 is the state after reading `"\u12` during a quoted string.
 func stateInStringEscU12(s *fileScanner, c int) int {
 	if '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F' {
+		s.parseBuf = append(s.parseBuf, rune(c))
 		s.step = stateInStringEscU123
 		return scanContinue
 	}
@@ -496,6 +540,7 @@ func stateInStringEscU12(s *fileScanner, c int) int {
 // stateInStringEscU123 is the state after reading `"\u123` during a quoted string.
 func stateInStringEscU123(s *fileScanner, c int) int {
 	if '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F' {
+		s.parseBuf = append(s.parseBuf, rune(c))
 		s.step = stateInString
 		return scanContinue
 	}
