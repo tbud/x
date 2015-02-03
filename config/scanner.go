@@ -143,6 +143,8 @@ func (s *fileScanner) checkValid(fileName string) error {
 		}
 	}
 
+	// stateEndValue(s, '\n')
+
 	// for i := range s.includesScanner {
 	// 	scan := s.includesScanner[i]
 	// 	var checkFile string
@@ -386,7 +388,7 @@ func stateBeginValue(s *fileScanner, c int) int {
 		return scanAppendBuf
 	case '#':
 		s.step = stateComment
-		return scanContinue
+		return stateEndValue(s, c)
 	case '\r', '\n':
 		s.step = stateEndValue
 		return stateEndValue(s, c)
@@ -398,6 +400,7 @@ func stateBeginValue(s *fileScanner, c int) int {
 	}
 	if unicode.IsLetter(rune(c)) {
 		s.step = stateNoQuoteString
+		s.bufType = bufTypeString
 		return stateNoQuoteString(s, c)
 	}
 	return s.error(c, "looking for beginning of value")
@@ -464,17 +467,6 @@ func stateEndValue(s *fileScanner, c int) int {
 	return s.error(c, "")
 }
 
-// stateEndTop is the state after finishing the top-level value,
-// such as after reading `{}` or `[1,2,3]`.
-// Only space characters should be seen now.
-func stateEndTop(s *fileScanner, c int) int {
-	if c != ' ' && c != '\t' && c != '\r' && c != '\n' {
-		// Complain about non-space byte on next call.
-		s.error(c, "after top-level value")
-	}
-	return scanEnd
-}
-
 // stateInString is the state after reading `"`.
 func stateInString(s *fileScanner, c int) int {
 	switch {
@@ -501,7 +493,7 @@ func stateNoQuoteString(s *fileScanner, c int) int {
 	}
 	if s.currentState == parseValue {
 		switch c {
-		case ',', '\n', '}':
+		case ',', '\n', '\r', '}':
 			s.trimParseBuf()
 			return stateEndValue(s, c)
 		}

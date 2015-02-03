@@ -1,7 +1,9 @@
 {
 	"test1" : {
 		"comment":"#",
+		"str":null,
 		"num":1,
+		"num3":3,
 		"ok":true,
 		"mylist": [1,2,3],
 		"user" : {
@@ -12,7 +14,13 @@
 		"empty1":null,
 		"empty2":null,
 		"empty3":null,
-		"empty4":null
+		"empty4":null,
+		"cover": {
+			"str" : "woshishei",
+			"negnum": -180,
+			"floatnum": 0.1215,
+			"fnum": 12.58
+		}
 	},
 	"test2" : {
 		"comment":"#",
