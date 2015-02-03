@@ -486,30 +486,20 @@ func stateInString(s *fileScanner, c int) int {
 func stateNoQuoteString(s *fileScanner, c int) int {
 	if s.currentState == parseKey {
 		switch c {
-		case '.', '=', ':', '{', '\r', '\n':
+		case '.', '=', ':', '{', '\r', '\n', '#':
 			s.trimParseBuf()
 			return stateEndValue(s, c)
 		}
 	}
 	if s.currentState == parseValue {
 		switch c {
-		case ',', '\n', '\r', '}':
+		case ',', '\n', '\r', '}', '#':
 			s.trimParseBuf()
 			return stateEndValue(s, c)
 		}
 	}
 
-	switch c {
-	case '#':
-		s.trimParseBuf()
-		s.step = stateComment
-		return stateEndValue(s, c)
-	case '\\':
-		s.step = stateInStringEsc
-		return scanAppendBuf
-	}
-
-	if c < 0x20 {
+	if c < 0x20 || c == '\\' {
 		return s.error(c, "in no quote string literal")
 	}
 

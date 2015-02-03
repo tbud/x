@@ -41,5 +41,10 @@
 		"empty2":null,
 		"empty3":null,
 		"empty4":null
+	},
+	"test3": {
+		"nstr": {
+			"slash": "abct"
+		}
 	}
 }
