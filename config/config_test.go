@@ -17,13 +17,13 @@ func getJsonMap(file string) (m interface{}, err error) {
 	return
 }
 
-func TestLoadSingleFile(t *testing.T) {
-	json, err := getJsonMap("testdata/singlefile.json")
+func compareJsonAndConfig(t *testing.T, jsonFile string, confFile string) {
+	json, err := getJsonMap(jsonFile)
 	if err != nil {
 		t.Error(err)
 	}
 
-	conf, err := Load("testdata/singlefile.conf")
+	conf, err := Load(confFile)
 	if err != nil {
 		t.Error(err)
 	}
@@ -31,4 +31,12 @@ func TestLoadSingleFile(t *testing.T) {
 	if !reflect.DeepEqual(json, conf.options) {
 		t.Errorf("\nwant %v\n got %v", json, conf.options)
 	}
+}
+
+func TestLoadSingleFile(t *testing.T) {
+	compareJsonAndConfig(t, "testdata/singlefile.json", "testdata/singlefile.conf")
+}
+
+func TestParseNormalJson(t *testing.T) {
+	compareJsonAndConfig(t, "testdata/singlefile.json", "testdata/singlefile.json")
 }

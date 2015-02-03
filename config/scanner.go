@@ -76,17 +76,12 @@ type kvPair struct {
 // every subsequent call will return scanError too.
 const (
 	// Continue.
-	scanContinue     = iota // uninteresting byte
-	scanBeginLiteral        // end implied by next result != scanContinue
-	scanBeginObject         // begin object
-	scanObjectKey           // just finished object key (string)
-	scanObjectValue         // just finished non-last object value
-	scanEndObject           // end object (implies scanObjectValue if possible)
-	scanBeginArray          // begin array
-	scanArrayValue          // just finished array value
-	scanEndArray            // end array (implies scanArrayValue if possible)
-	scanSkipSpace           // space byte; can skip; known to be last "continue" result
-	scanAppendBuf           // byte need to append buf
+	scanContinue   = iota // uninteresting byte
+	scanBeginArray        // begin array
+	scanArrayValue        // just finished array value
+	scanEndArray          // end array (implies scanArrayValue if possible)
+	scanSkipSpace         // space byte; can skip; known to be last "continue" result
+	scanAppendBuf         // byte need to append buf
 
 	// Stop.
 	scanEnd   // top-level value ended *before* this byte; known to be first "stop" result
@@ -98,11 +93,9 @@ const (
 // being scanned.  If the parser is inside a nested value
 // the parseState describes the nested state, outermost at entry 0.
 const (
-	parseObjectKey   = iota // parsing object key (before colon)
-	parseObjectValue        // parsing object value (after colon)
-	parseArrayValue         // parsing array value
-	parseKey
-	parseValue
+	parseKey        = iota // parsing object key (before colon)
+	parseValue             // parsing object value (after colon)
+	parseArrayValue        // parsing array value
 	parseError
 )
 
@@ -118,7 +111,7 @@ const (
 
 // reset prepares the scanner for use.
 // It must be called before calling s.step.
-func (s *fileScanner) reset() {
+func (s *fileScanner) init() {
 	s.step = stateBeginKey
 	s.err = nil
 	s.bytes = 0
@@ -127,7 +120,7 @@ func (s *fileScanner) reset() {
 // checkValid verifies that data is valid HOCON-encoded data.
 // scan is passed in for use by checkValid to avoid an allocation.
 func (s *fileScanner) checkValid(fileName string) error {
-	s.reset()
+	s.init()
 
 	if !filepath.IsAbs(fileName) {
 		return &SyntaxError{"file '" + fileName + "' is not absolute path", s.bytes}
@@ -150,9 +143,6 @@ func (s *fileScanner) checkValid(fileName string) error {
 			s.parseBuf = append(s.parseBuf, rune(c))
 		}
 	}
-	// if s.eof() == scanError {
-	// 	return s.err
-	// }
 
 	// for i := range s.includesScanner {
 	// 	scan := s.includesScanner[i]
@@ -336,6 +326,11 @@ func stateBeginKey(s *fileScanner, c int) int {
 		s.currentState = parseKey
 		return stateNoQuoteString(s, c)
 	}
+
+	if len(s.keyStack) > 0 && c == ',' {
+		s.step = stateBeginKey
+		return scanContinue
+	}
 	return s.error(c, "looking for beginning")
 }
 
@@ -396,31 +391,6 @@ func stateBeginValue(s *fileScanner, c int) int {
 		return stateNoQuoteString(s, c)
 	}
 	return s.error(c, "looking for beginning of value")
-}
-
-// stateBeginStringOrEmpty is the state after reading `{`.
-// func stateBeginStringOrEmpty(s *fileScanner, c int) int {
-// 	if c <= ' ' && isSpace(rune(c)) {
-// 		return scanSkipSpace
-// 	}
-// 	if c == '}' {
-// 		n := len(s.parseState)
-// 		s.parseState[n-1] = parseObjectValue
-// 		return stateEndValue(s, c)
-// 	}
-// 	return stateBeginString(s, c)
-// }
-
-// stateBeginString is the state after reading `{"key": value,`.
-func stateBeginString(s *fileScanner, c int) int {
-	if c <= ' ' && isSpace(rune(c)) {
-		return scanSkipSpace
-	}
-	if c == '"' {
-		s.step = stateInString
-		return scanBeginLiteral
-	}
-	return s.error(c, "looking for beginning of object key string")
 }
 
 // stateEndValue is the state after completing a value,
