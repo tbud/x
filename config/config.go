@@ -29,7 +29,7 @@ func Load(fileName string) (config Config, err error) {
 		}
 	}()
 
-	config = Config{}
+	config = Config{map[string]interface{}{}}
 	scan := fileScanner{}
 
 	if !filepath.IsAbs(fileName) {
@@ -44,9 +44,7 @@ func Load(fileName string) (config Config, err error) {
 		return
 	}
 
-	// file := filepath.Base(fileName)
-
-	// config.include(config.top, file)
+	err = scan.setOptions(config.options)
 	return
 }
 

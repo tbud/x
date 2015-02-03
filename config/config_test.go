@@ -29,6 +29,6 @@ func TestLoadSingleFile(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(json, conf.options) {
-		t.Errorf("want %v, got %v", json, conf.options)
+		t.Errorf("\nwant %v\n got %v", json, conf.options)
 	}
 }
