@@ -3,6 +3,7 @@
 		"comment":"#",
 		"num":1,
 		"ok":true,
+		"mylist": [1,2,3],
 		"user" : {
 			"name": "py",
 			"age": 1,
@@ -17,10 +18,14 @@
 		"comment":"#",
 		"num":2,
 		"ok":false,
+		"mylist": ["1", "2", "3"],
 		"user" : {
 			"name": "py",
 			"nodead": true,
-			"age": 1
+			"age": 1,
+			"testbool" : {
+				"list" : [true, false]
+			}
 		},
 		"empty1":null,
 		"empty2":null,

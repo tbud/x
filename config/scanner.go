@@ -259,8 +259,26 @@ func (s *fileScanner) pushValue() {
 	s.bufType = bufTypeNull
 }
 
-func (s *fileScanner) pushArrayValue() {
+func (s *fileScanner) pushArrayKey() {
+	baseKeys := make([]string, len(s.baseKeys))
+	copy(baseKeys, s.baseKeys)
 
+	s.kvs = append(s.kvs, kvPair{baseKeys, []interface{}{}})
+
+	if stackLen := len(s.keyStack); stackLen > 0 {
+		stack := s.keyStack[stackLen-1]
+		s.baseKeys = s.baseKeys[0:stack]
+	} else {
+		s.baseKeys = s.baseKeys[0:0]
+	}
+}
+
+func (s *fileScanner) pushArrayValue() {
+	kv := &s.kvs[len(s.kvs)-1]
+	kv.value = append(kv.value.([]interface{}), s.parseBufValue())
+
+	s.parseBuf = s.parseBuf[0:0]
+	s.bufType = bufTypeNull
 }
 
 // parse buf to type value
@@ -338,6 +356,7 @@ func stateBeginValue(s *fileScanner, c int) int {
 		s.currentState = parseKey
 		return scanContinue
 	case '[':
+		s.pushArrayKey()
 		s.step = stateBeginValue
 		s.currentState = parseArrayValue
 		return scanContinue
@@ -430,11 +449,14 @@ func stateEndValue(s *fileScanner, c int) int {
 		return s.error(c, "after object key:value pair")
 	case parseArrayValue:
 		if c == ',' {
+			s.pushArrayValue()
 			s.step = stateBeginValue
 			return scanContinue
 		}
 		if c == ']' {
-			// s.popParseState()
+			s.pushArrayValue()
+			s.step = stateBeginKey
+			s.currentState = parseKey
 			return scanContinue
 		}
 		return s.error(c, "after array element")
