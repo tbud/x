@@ -451,13 +451,12 @@ func stateEndValue(s *fileScanner, c int) int {
 		}
 		return s.error(c, "after object key:value pair")
 	case parseArrayValue:
-		if c == ',' {
-			s.pushArrayValue()
+		s.pushArrayValue()
+		switch c {
+		case ',':
 			s.step = stateBeginValue
 			return scanContinue
-		}
-		if c == ']' {
-			s.pushArrayValue()
+		case ']':
 			s.step = stateBeginKey
 			s.currentState = parseKey
 			return scanContinue
@@ -502,7 +501,6 @@ func stateNoQuoteString(s *fileScanner, c int) int {
 	if c < 0x20 || c == '\\' {
 		return s.error(c, "in no quote string literal")
 	}
-
 	return scanAppendBuf
 }
 
