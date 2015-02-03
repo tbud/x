@@ -10,9 +10,10 @@ package config
 // before diving into the scanner itself.
 
 import (
-	// "fmt"
+	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"unicode"
@@ -76,12 +77,9 @@ type kvPair struct {
 // every subsequent call will return scanError too.
 const (
 	// Continue.
-	scanContinue   = iota // uninteresting byte
-	scanBeginArray        // begin array
-	scanArrayValue        // just finished array value
-	scanEndArray          // end array (implies scanArrayValue if possible)
-	scanSkipSpace         // space byte; can skip; known to be last "continue" result
-	scanAppendBuf         // byte need to append buf
+	scanContinue  = iota // uninteresting byte
+	scanSkipSpace        // space byte; can skip; known to be last "continue" result
+	scanAppendBuf        // byte need to append buf
 
 	// Stop.
 	scanEnd   // top-level value ended *before* this byte; known to be first "stop" result
@@ -115,6 +113,7 @@ func (s *fileScanner) init() {
 	s.step = stateBeginKey
 	s.err = nil
 	s.bytes = 0
+	s.currentState = parseKey
 }
 
 // checkValid verifies that data is valid HOCON-encoded data.
@@ -183,6 +182,7 @@ func setOptionValue(kv kvPair, options map[string]interface{}) error {
 			if v, ok := optMap.(map[string]interface{}); ok {
 				options = v
 			} else {
+				fmt.Println(kv.keys, reflect.TypeOf(optMap))
 				return &SyntaxError{"set options value error, key " + key + " is not a map[string]interface{}", int64(i)}
 			}
 		} else {
@@ -225,8 +225,8 @@ func (s *fileScanner) popKeyStack() {
 		s.baseKeys = s.baseKeys[0:stack]
 		s.keyStack = s.keyStack[0 : keylen-1]
 	case keylen == 1:
-		s.baseKeys = []string{}
-		s.keyStack = []int{}
+		s.baseKeys = s.baseKeys[0:0]
+		s.keyStack = s.keyStack[0:0]
 	case keylen <= 0:
 		panic(&SyntaxError{"error pop key stack operate", s.bytes})
 	}
@@ -234,7 +234,7 @@ func (s *fileScanner) popKeyStack() {
 
 func (s *fileScanner) pushKey() {
 	s.baseKeys = append(s.baseKeys, string(s.parseBuf))
-	s.parseBuf = []rune{}
+	s.parseBuf = s.parseBuf[0:0]
 }
 
 func (s *fileScanner) pushValue() {
@@ -244,11 +244,28 @@ func (s *fileScanner) pushValue() {
 		s.kvs = append(s.kvs, kvPair{baseKeys, nil})
 	}
 
-	// parse buf to type value
-	var (
-		value interface{}
-		err   error
-	)
+	s.kvs = append(s.kvs, kvPair{baseKeys, s.parseBufValue()})
+
+	// pop base key
+	if stackLen := len(s.keyStack); stackLen > 0 {
+		stack := s.keyStack[stackLen-1]
+		s.baseKeys = s.baseKeys[0:stack]
+	} else {
+		s.baseKeys = s.baseKeys[0:0]
+	}
+
+	// reinit parse buf
+	s.parseBuf = s.parseBuf[0:0]
+	s.bufType = bufTypeNull
+}
+
+func (s *fileScanner) pushArrayValue() {
+
+}
+
+// parse buf to type value
+func (s *fileScanner) parseBufValue() (value interface{}) {
+	var err error
 
 	switch s.bufType {
 	case bufTypeString:
@@ -262,19 +279,7 @@ func (s *fileScanner) pushValue() {
 	case bufTypeNull:
 		value = nil
 	}
-	s.kvs = append(s.kvs, kvPair{baseKeys, value})
-
-	// pop base key
-	if stackLen := len(s.keyStack); stackLen > 0 {
-		stack := s.keyStack[stackLen-1]
-		s.baseKeys = s.baseKeys[0:stack]
-	} else {
-		s.baseKeys = []string{}
-	}
-
-	// reinit parse buf
-	s.parseBuf = []rune{}
-	s.bufType = bufTypeNull
+	return
 }
 
 func (s *fileScanner) trimParseBuf() {
@@ -283,17 +288,6 @@ func (s *fileScanner) trimParseBuf() {
 
 func isSpace(c rune) bool {
 	return c == ' ' || c == '\t' || c == '\r' || c == '\n'
-}
-
-// stateBeginValueOrEmpty is the state after reading `[`.
-func stateBeginValueOrEmpty(s *fileScanner, c int) int {
-	if c <= ' ' && isSpace(rune(c)) {
-		return scanSkipSpace
-	}
-	if c == ']' {
-		return stateEndValue(s, c)
-	}
-	return stateBeginValue(s, c)
 }
 
 func stateBeginKey(s *fileScanner, c int) int {
@@ -307,7 +301,6 @@ func stateBeginKey(s *fileScanner, c int) int {
 		return scanContinue
 	case '"':
 		s.step = stateInString
-		s.currentState = parseKey
 		return scanContinue
 	case '#':
 		s.step = stateComment
@@ -323,7 +316,6 @@ func stateBeginKey(s *fileScanner, c int) int {
 
 	if unicode.IsLetter(rune(c)) {
 		s.step = stateNoQuoteString
-		s.currentState = parseKey
 		return stateNoQuoteString(s, c)
 	}
 
@@ -343,14 +335,14 @@ func stateBeginValue(s *fileScanner, c int) int {
 	case '{':
 		s.pushKeyStack()
 		s.step = stateBeginKey
+		s.currentState = parseKey
 		return scanContinue
 	case '[':
-		s.step = stateBeginValueOrEmpty
-		// s.pushParseState(parseArrayValue)
-		return scanBeginArray
+		s.step = stateBeginValue
+		s.currentState = parseArrayValue
+		return scanContinue
 	case '"':
 		s.step = stateInString
-		s.currentState = parseValue
 		s.bufType = bufTypeString
 		return scanContinue
 	case '-':
@@ -387,7 +379,6 @@ func stateBeginValue(s *fileScanner, c int) int {
 	}
 	if unicode.IsLetter(rune(c)) {
 		s.step = stateNoQuoteString
-		s.currentState = parseValue
 		return stateNoQuoteString(s, c)
 	}
 	return s.error(c, "looking for beginning of value")
@@ -423,6 +414,7 @@ func stateEndValue(s *fileScanner, c int) int {
 		return s.error(c, "after object key")
 	case parseValue:
 		s.pushValue()
+		s.currentState = parseKey
 		switch c {
 		case ',', '\n', '\r':
 			s.step = stateBeginKey
@@ -439,11 +431,11 @@ func stateEndValue(s *fileScanner, c int) int {
 	case parseArrayValue:
 		if c == ',' {
 			s.step = stateBeginValue
-			return scanArrayValue
+			return scanContinue
 		}
 		if c == ']' {
 			// s.popParseState()
-			return scanEndArray
+			return scanContinue
 		}
 		return s.error(c, "after array element")
 	}
