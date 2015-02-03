@@ -30,7 +30,7 @@
 		"ok":false,
 		"mylist": ["1", "2", "3"],
 		"user" : {
-			"name": "py",
+			"name": "彭毅",
 			"nodead": true,
 			"age": 1,
 			"testbool" : {
@@ -44,7 +44,7 @@
 	},
 	"test3": {
 		"nstr": {
-			"slash": "abct"
+			"slash": "abc\t"
 		}
 	}
 }
