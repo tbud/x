@@ -428,7 +428,7 @@ func stateEndValue(s *fileScanner, c int) int {
 			s.pushKeyStack()
 			s.step = stateBeginKey
 			return scanContinue
-		case '\r', '\n':
+		case '\r', '\n', '#':
 			s.currentState = parseValue
 			s.step = stateEndValue
 			return stateEndValue(s, c)
@@ -501,6 +501,7 @@ func stateNoQuoteString(s *fileScanner, c int) int {
 
 	switch c {
 	case '#':
+		s.trimParseBuf()
 		s.step = stateComment
 		return stateEndValue(s, c)
 	case '\\':
