@@ -249,9 +249,9 @@ func (s *fileScanner) pushValue() {
 	copy(baseKeys, s.baseKeys)
 	if len(s.parseBuf) == 0 {
 		s.kvs = append(s.kvs, kvPair{baseKeys, nil})
+	} else {
+		s.kvs = append(s.kvs, kvPair{baseKeys, s.parseBufValue()})
 	}
-
-	s.kvs = append(s.kvs, kvPair{baseKeys, s.parseBufValue()})
 
 	// pop base key
 	if stackLen := len(s.keyStack); stackLen > 0 {
@@ -333,6 +333,7 @@ func stateBeginKey(s *fileScanner, c int) int {
 		return scanContinue
 	case '"':
 		s.step = stateInString
+		s.bufType = bufTypeString
 		return scanContinue
 	case '#':
 		s.step = stateComment
@@ -344,8 +345,9 @@ func stateBeginKey(s *fileScanner, c int) int {
 	}
 
 	if unicode.IsLetter(rune(c)) {
-		s.step = stateNoQuoteString
-		return stateNoQuoteString(s, c)
+		s.step = stateInString
+		s.bufType = bufTypeNoQuoteString
+		return stateInString(s, c)
 	}
 
 	if len(s.keyStack) > 0 && c == ',' {
@@ -411,9 +413,9 @@ func stateBeginValue(s *fileScanner, c int) int {
 		return scanAppendBuf
 	}
 	if unicode.IsLetter(rune(c)) {
-		s.step = stateNoQuoteString
+		s.step = stateInString
 		s.bufType = bufTypeNoQuoteString
-		return stateNoQuoteString(s, c)
+		return stateInString(s, c)
 	}
 	return s.error(c, "looking for beginning of value")
 }
@@ -483,46 +485,46 @@ func stateEndValue(s *fileScanner, c int) int {
 
 // stateInString is the state after reading `"`.
 func stateInString(s *fileScanner, c int) int {
-	switch {
-	case c == '"':
-		s.step = stateEndValue
-		return scanContinue
-	case c == '\\':
+	// check string end
+	if s.bufType == bufTypeNoQuoteString {
+		if s.currentState == parseKey {
+			switch c {
+			case '.', '=', ':', '{', '\r', '\n', '#':
+				s.trimParseBuf()
+				return stateEndValue(s, c)
+			}
+		}
+		if s.currentState == parseValue {
+			switch c {
+			case ',', '\r', '\n', '}', '#':
+				s.trimParseBuf()
+				return stateEndValue(s, c)
+			}
+		}
+		if s.currentState == parseArrayValue {
+			switch c {
+			case ',', '\r', '\n', ']', '#':
+				s.trimParseBuf()
+				return stateEndValue(s, c)
+			}
+		}
+	} else {
+		if c == '"' {
+			s.step = stateEndValue
+			return scanContinue
+		}
+	}
+
+	// check special char
+	if c == '\\' {
 		s.step = stateInStringEsc
 		return scanAppendBuf
-	case c < 0x20:
+	}
+
+	if c < 0x20 {
 		return s.error(c, "in string literal")
 	}
 
-	return scanAppendBuf
-}
-
-func stateNoQuoteString(s *fileScanner, c int) int {
-	if s.currentState == parseKey {
-		switch c {
-		case '.', '=', ':', '{', '\r', '\n', '#':
-			s.trimParseBuf()
-			return stateEndValue(s, c)
-		}
-	}
-	if s.currentState == parseValue {
-		switch c {
-		case ',', '\r', '\n', '}', '#':
-			s.trimParseBuf()
-			return stateEndValue(s, c)
-		}
-	}
-	if s.currentState == parseArrayValue {
-		switch c {
-		case ',', '\r', '\n', ']', '#':
-			s.trimParseBuf()
-			return stateEndValue(s, c)
-		}
-	}
-
-	if c < 0x20 || c == '\\' {
-		return s.error(c, "in no quote string literal")
-	}
 	return scanAppendBuf
 }
 
