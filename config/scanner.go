@@ -528,7 +528,11 @@ func stateNoQuoteString(s *fileScanner, c int) int {
 
 func stateComment(s *fileScanner, c int) int {
 	if c == '\n' || c == '\r' {
-		s.step = stateBeginKey
+		if s.currentState == parseArrayValue {
+			s.step = stateBeginValue
+		} else {
+			s.step = stateBeginKey
+		}
 		return scanContinue
 	}
 	return scanContinue
