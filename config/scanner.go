@@ -293,7 +293,7 @@ func (s *fileScanner) parseBufValue() (value interface{}) {
 	var err error
 
 	if s.bufType == bufTypeNoQuoteString {
-		valueKeyword.checkKeyword(s, s.parseBuf)
+		keywords.checkKeyword(s, s.parseBuf)
 	}
 
 	switch s.bufType {
@@ -354,12 +354,6 @@ func stateBeginKey(s *fileScanner, c int) int {
 		s.step = stateBeginKey
 		return scanContinue
 	}
-
-	if len(s.baseKeys) > 0 && c == 'i' {
-		s.step = stateI
-		return scanContinue
-	}
-
 	return s.error(c, "looking for beginning")
 }
 
@@ -689,54 +683,6 @@ func stateE0(s *fileScanner, c int) int {
 	return stateEndValue(s, c)
 }
 
-func stateI(s *fileScanner, c int) int {
-	if c == 'n' {
-		s.step = stateIn
-		return scanAppendBuf
-	}
-	return s.error(c, "in literal include (expecting 'n')")
-}
-
-func stateIn(s *fileScanner, c int) int {
-	if c == 'c' {
-		s.step = stateInc
-		return scanAppendBuf
-	}
-	return s.error(c, "in literal include (expecting 'c')")
-}
-
-func stateInc(s *fileScanner, c int) int {
-	if c == 'l' {
-		s.step = stateIncl
-		return scanAppendBuf
-	}
-	return s.error(c, "in literal include (expecting 'l')")
-}
-
-func stateIncl(s *fileScanner, c int) int {
-	if c == 'u' {
-		s.step = stateInclu
-		return scanAppendBuf
-	}
-	return s.error(c, "in literal include (expecting 'u')")
-}
-
-func stateInclu(s *fileScanner, c int) int {
-	if c == 'd' {
-		s.step = stateInclud
-		return scanAppendBuf
-	}
-	return s.error(c, "in literal include (expecting 'd')")
-}
-
-func stateInclud(s *fileScanner, c int) int {
-	if c == 'e' {
-		s.step = stateEndValue
-		return scanAppendBuf
-	}
-	return s.error(c, "in literal include (expecting 'e')")
-}
-
 // stateError is the state after reaching a syntax error,
 // such as after reading `[1}` or `5.1.2`.
 func stateError(s *fileScanner, c int) int {
@@ -897,16 +843,10 @@ type keywordScanner struct {
 	keywordsType []int
 }
 
-var keyKeyword = keywordScanner{
+var keywords = keywordScanner{
 	0,
-	[]string{"include"},
-	[]int{bufTypeInclude},
-}
-
-var valueKeyword = keywordScanner{
-	0,
-	[]string{"true", "false", "null", "include"},
-	[]int{bufTypeBoolTrue, bufTypeBoolFalse, bufTypeNull, bufTypeInclude},
+	[]string{"true", "false", "null"},
+	[]int{bufTypeBoolTrue, bufTypeBoolFalse, bufTypeNull},
 }
 
 func (k *keywordScanner) init() {
@@ -931,6 +871,5 @@ func (k *keywordScanner) checkKeyword(s *fileScanner, buf []byte) {
 }
 
 func init() {
-	keyKeyword.init()
-	valueKeyword.init()
+	keywords.init()
 }
