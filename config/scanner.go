@@ -149,6 +149,11 @@ func (s *fileScanner) checkValid(fileName string) error {
 			s.parseBuf = append(s.parseBuf, c)
 		}
 	}
+
+	if s.step(s, '\n') == scanError {
+		return s.err
+	}
+
 	return nil
 }
 
