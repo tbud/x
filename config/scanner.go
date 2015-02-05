@@ -24,10 +24,13 @@ import (
 // A SyntaxError is a description of a HOCON syntax error.
 type SyntaxError struct {
 	msg    string // description of error
+	buf    []byte // save file scan parse buf
 	Offset int64  // error occurred after reading Offset bytes
 }
 
-func (e *SyntaxError) Error() string { return e.msg + " Offset " + strconv.FormatInt(e.Offset, 10) }
+func (e *SyntaxError) Error() string {
+	return e.msg + strconv.Quote(string(e.buf)) + " Offset " + strconv.FormatInt(e.Offset, 10)
+}
 
 // A scanner is a HOCON scanning state machine.
 // Callers call scan.reset() and then pass bytes in one at a time
@@ -100,13 +103,13 @@ const (
 )
 
 const (
-	bufTypeString = iota
+	bufTypeNull = iota
+	bufTypeString
+	bufTypeNoQuoteString
 	bufTypeNumber
 	bufTypeBoolTrue
 	bufTypeBoolFalse
 	bufTypeInclude
-	bufTypeNull
-	// bufTypeArray
 )
 
 // reset prepares the scanner for use.
@@ -124,12 +127,12 @@ func (s *fileScanner) checkValid(fileName string) error {
 	s.init()
 
 	if !filepath.IsAbs(fileName) {
-		return &SyntaxError{"file '" + fileName + "' is not absolute path", s.bytes}
+		return s.errorSyntax("file '" + fileName + "' is not absolute path")
 	}
 	var err error
 	s.data, err = ioutil.ReadFile(fileName)
 	if err != nil {
-		return &SyntaxError{err.Error(), s.bytes}
+		return s.errorSyntax(err.Error())
 	}
 
 	s.file = filepath.Base(fileName)
@@ -187,7 +190,7 @@ func setOptionValue(kv kvPair, options map[string]interface{}) error {
 				options = v
 			} else {
 				fmt.Println(kv.keys, reflect.TypeOf(optMap))
-				return &SyntaxError{"set options value error, key " + key + " is not a map[string]interface{}", int64(i)}
+				return &SyntaxError{"set options value error, key " + key + " is not a map[string]interface{}", []byte{}, int64(i)}
 			}
 		} else {
 			options[key] = map[string]interface{}{}
@@ -206,7 +209,7 @@ func setIncludeValue(kv kvPair, options map[string]interface{}) error {
 			if v, ok := optMap.(map[string]interface{}); ok {
 				options = v
 			} else {
-				return &SyntaxError{"set options value error, key " + key + " is not a map[string]interface{}", int64(i)}
+				return &SyntaxError{"set options value error, key " + key + " is not a map[string]interface{}", []byte{}, int64(i)}
 			}
 		} else {
 			options[key] = map[string]interface{}{}
@@ -232,7 +235,7 @@ func (s *fileScanner) popKeyStack() {
 		s.baseKeys = s.baseKeys[0:0]
 		s.keyStack = s.keyStack[0:0]
 	case keylen <= 0:
-		panic(&SyntaxError{"error pop key stack operate", s.bytes})
+		panic(s.errorSyntax("error pop key stack operate"))
 	}
 }
 
@@ -289,15 +292,19 @@ func (s *fileScanner) pushArrayValue() {
 func (s *fileScanner) parseBufValue() (value interface{}) {
 	var err error
 
+	if s.bufType == bufTypeNoQuoteString {
+		valueKeyword.checkKeyword(s, s.parseBuf)
+	}
+
 	switch s.bufType {
-	case bufTypeString:
+	case bufTypeString, bufTypeNoQuoteString:
 		if b, ok := stringBytes(s.parseBuf); ok {
 			value = string(b)
 		}
 		// value = string(s.parseBuf)
 	case bufTypeNumber:
 		if value, err = strconv.ParseFloat(string(s.parseBuf), 64); err != nil {
-			panic(&SyntaxError{"number " + string(s.parseBuf) + " parse error: " + err.Error(), s.bytes})
+			panic(s.errorSyntax("number " + string(s.parseBuf) + " parse error: " + err.Error()))
 		}
 	case bufTypeBoolTrue, bufTypeBoolFalse:
 		value = s.bufType == bufTypeBoolTrue
@@ -330,9 +337,6 @@ func stateBeginKey(s *fileScanner, c int) int {
 	case '#':
 		s.step = stateComment
 		return scanContinue
-	case 'i':
-		s.step = stateI
-		return scanContinue
 	case '}':
 		s.popKeyStack()
 		s.step = stateBeginKey
@@ -348,14 +352,29 @@ func stateBeginKey(s *fileScanner, c int) int {
 		s.step = stateBeginKey
 		return scanContinue
 	}
+
+	if len(s.baseKeys) > 0 && c == 'i' {
+		s.step = stateI
+		return scanContinue
+	}
+
 	return s.error(c, "looking for beginning")
 }
 
 // stateBeginValue is the state at the beginning of the input.
 func stateBeginValue(s *fileScanner, c int) int {
-	if c <= ' ' && (c == ' ' || c == '\t') {
-		return scanSkipSpace
+	if c <= ' ' {
+		if s.currentState == parseArrayValue {
+			if isSpace(rune(c)) {
+				return scanSkipSpace
+			}
+		} else {
+			if c == ' ' || c == '\t' {
+				return scanSkipSpace
+			}
+		}
 	}
+
 	switch c {
 	case '{':
 		s.pushKeyStack()
@@ -379,18 +398,6 @@ func stateBeginValue(s *fileScanner, c int) int {
 		s.step = state0
 		s.bufType = bufTypeNumber
 		return scanAppendBuf
-	case 't': // beginning of true
-		s.step = stateT
-		s.bufType = bufTypeBoolTrue
-		return scanAppendBuf
-	case 'f': // beginning of false
-		s.step = stateF
-		s.bufType = bufTypeBoolFalse
-		return scanAppendBuf
-	case 'n': // beginning of null
-		s.step = stateN
-		s.bufType = bufTypeNull
-		return scanAppendBuf
 	case '#':
 		s.step = stateComment
 		return stateEndValue(s, c)
@@ -405,7 +412,7 @@ func stateBeginValue(s *fileScanner, c int) int {
 	}
 	if unicode.IsLetter(rune(c)) {
 		s.step = stateNoQuoteString
-		s.bufType = bufTypeString
+		s.bufType = bufTypeNoQuoteString
 		return stateNoQuoteString(s, c)
 	}
 	return s.error(c, "looking for beginning of value")
@@ -443,7 +450,7 @@ func stateEndValue(s *fileScanner, c int) int {
 		s.pushValue()
 		s.currentState = parseKey
 		switch c {
-		case ',', '\n', '\r':
+		case ',', '\r', '\n':
 			s.step = stateBeginKey
 			return scanContinue
 		case '}':
@@ -458,12 +465,15 @@ func stateEndValue(s *fileScanner, c int) int {
 	case parseArrayValue:
 		s.pushArrayValue()
 		switch c {
-		case ',':
+		case ',', '\r', '\n':
 			s.step = stateBeginValue
 			return scanContinue
 		case ']':
 			s.step = stateBeginKey
 			s.currentState = parseKey
+			return scanContinue
+		case '#':
+			s.step = stateComment
 			return scanContinue
 		}
 		return s.error(c, "after array element")
@@ -497,7 +507,14 @@ func stateNoQuoteString(s *fileScanner, c int) int {
 	}
 	if s.currentState == parseValue {
 		switch c {
-		case ',', '\n', '\r', '}', '#':
+		case ',', '\r', '\n', '}', '#':
+			s.trimParseBuf()
+			return stateEndValue(s, c)
+		}
+	}
+	if s.currentState == parseArrayValue {
+		switch c {
+		case ',', '\r', '\n', ']', '#':
 			s.trimParseBuf()
 			return stateEndValue(s, c)
 		}
@@ -714,96 +731,6 @@ func stateInclud(s *fileScanner, c int) int {
 	return s.error(c, "in literal include (expecting 'e')")
 }
 
-// stateT is the state after reading `t`.
-func stateT(s *fileScanner, c int) int {
-	if c == 'r' {
-		s.step = stateTr
-		return scanAppendBuf
-	}
-	return s.error(c, "in literal true (expecting 'r')")
-}
-
-// stateTr is the state after reading `tr`.
-func stateTr(s *fileScanner, c int) int {
-	if c == 'u' {
-		s.step = stateTru
-		return scanAppendBuf
-	}
-	return s.error(c, "in literal true (expecting 'u')")
-}
-
-// stateTru is the state after reading `tru`.
-func stateTru(s *fileScanner, c int) int {
-	if c == 'e' {
-		s.step = stateEndValue
-		return scanAppendBuf
-	}
-	return s.error(c, "in literal true (expecting 'e')")
-}
-
-// stateF is the state after reading `f`.
-func stateF(s *fileScanner, c int) int {
-	if c == 'a' {
-		s.step = stateFa
-		return scanAppendBuf
-	}
-	return s.error(c, "in literal false (expecting 'a')")
-}
-
-// stateFa is the state after reading `fa`.
-func stateFa(s *fileScanner, c int) int {
-	if c == 'l' {
-		s.step = stateFal
-		return scanAppendBuf
-	}
-	return s.error(c, "in literal false (expecting 'l')")
-}
-
-// stateFal is the state after reading `fal`.
-func stateFal(s *fileScanner, c int) int {
-	if c == 's' {
-		s.step = stateFals
-		return scanAppendBuf
-	}
-	return s.error(c, "in literal false (expecting 's')")
-}
-
-// stateFals is the state after reading `fals`.
-func stateFals(s *fileScanner, c int) int {
-	if c == 'e' {
-		s.step = stateEndValue
-		return scanAppendBuf
-	}
-	return s.error(c, "in literal false (expecting 'e')")
-}
-
-// stateN is the state after reading `n`.
-func stateN(s *fileScanner, c int) int {
-	if c == 'u' {
-		s.step = stateNu
-		return scanAppendBuf
-	}
-	return s.error(c, "in literal null (expecting 'u')")
-}
-
-// stateNu is the state after reading `nu`.
-func stateNu(s *fileScanner, c int) int {
-	if c == 'l' {
-		s.step = stateNul
-		return scanAppendBuf
-	}
-	return s.error(c, "in literal null (expecting 'l')")
-}
-
-// stateNul is the state after reading `nul`.
-func stateNul(s *fileScanner, c int) int {
-	if c == 'l' {
-		s.step = stateEndValue
-		return scanAppendBuf
-	}
-	return s.error(c, "in literal null (expecting 'l')")
-}
-
 // stateError is the state after reaching a syntax error,
 // such as after reading `[1}` or `5.1.2`.
 func stateError(s *fileScanner, c int) int {
@@ -813,8 +740,12 @@ func stateError(s *fileScanner, c int) int {
 // error records an error and switches to the error state.
 func (s *fileScanner) error(c int, context string) int {
 	s.step = stateError
-	s.err = &SyntaxError{"invalid character " + quoteChar(c) + " " + context, s.bytes}
+	s.err = &SyntaxError{"invalid character " + quoteChar(c) + " " + context, s.parseBuf, s.bytes}
 	return scanError
+}
+
+func (s *fileScanner) errorSyntax(context string) *SyntaxError {
+	return &SyntaxError{context, s.parseBuf, s.bytes}
 }
 
 // quoteChar formats c as a quoted character literal
@@ -952,4 +883,48 @@ func stringBytes(s []byte) (t []byte, ok bool) {
 		}
 	}
 	return b[0:w], true
+}
+
+type keywordScanner struct {
+	maxWordLen   int
+	keywords     []string
+	keywordsType []int
+}
+
+var keyKeyword = keywordScanner{
+	0,
+	[]string{"include"},
+	[]int{bufTypeInclude},
+}
+
+var valueKeyword = keywordScanner{
+	0,
+	[]string{"true", "false", "null", "include"},
+	[]int{bufTypeBoolTrue, bufTypeBoolFalse, bufTypeNull, bufTypeInclude},
+}
+
+func (k *keywordScanner) init() {
+	for i := range k.keywords {
+		wordLen := len(k.keywords[i])
+		if wordLen > k.maxWordLen {
+			k.maxWordLen = wordLen
+		}
+	}
+}
+
+func (k *keywordScanner) checkKeyword(s *fileScanner, buf []byte) {
+	if len(buf) <= k.maxWordLen {
+		value := string(buf)
+		for i := range k.keywords {
+			if value == k.keywords[i] {
+				s.bufType = k.keywordsType[i]
+				return
+			}
+		}
+	}
+}
+
+func init() {
+	keyKeyword.init()
+	valueKeyword.init()
 }

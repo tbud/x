@@ -5,7 +5,8 @@
 		"num":1,
 		"num3":3,
 		"ok":true,
-		"mylist": [1,2,3],
+		"mylist1": [1,2,3],
+		"mylist2": [1,2,3,4],
 		"user" : {
 			"name": "py",
 			"age": 1,
@@ -43,7 +44,7 @@
 		"empty4":null
 	},
 	"test3": {
-		"nstr": {
+		"instr": {
 			"slash": "abc\t"
 		}
 	}
