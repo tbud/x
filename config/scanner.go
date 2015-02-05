@@ -155,55 +155,24 @@ func (s *fileScanner) checkValid(fileName string) error {
 func (s *fileScanner) setOptions(options map[string]interface{}) error {
 	for i := range s.kvs {
 		kv := s.kvs[i]
-		if _, ok := kv.value.(*fileScanner); ok {
-			if err := setIncludeValue(kv, options); err != nil {
-				return err
-			}
-		} else {
-			if err := setOptionValue(kv, options); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func setOptionValue(kv kvPair, options map[string]interface{}) error {
-	for i := 0; i < len(kv.keys)-1; i++ {
-		key := kv.keys[i]
-		if optMap, ok := options[key]; ok {
-			if v, ok := optMap.(map[string]interface{}); ok {
-				options = v
+		ops := options
+		for i := 0; i < len(kv.keys)-1; i++ {
+			key := kv.keys[i]
+			if optMap, ok := ops[key]; ok {
+				if v, ok := optMap.(map[string]interface{}); ok {
+					ops = v
+				} else {
+					fmt.Println(kv.keys, reflect.TypeOf(optMap))
+					return &SyntaxError{"set options value error, key " + key + " is not a map[string]interface{}", []byte{}, int64(i)}
+				}
 			} else {
-				fmt.Println(kv.keys, reflect.TypeOf(optMap))
-				return &SyntaxError{"set options value error, key " + key + " is not a map[string]interface{}", []byte{}, int64(i)}
+				ops[key] = map[string]interface{}{}
+				ops = ops[key].(map[string]interface{})
 			}
-		} else {
-			options[key] = map[string]interface{}{}
-			options = options[key].(map[string]interface{})
 		}
+
+		ops[kv.keys[len(kv.keys)-1]] = kv.value
 	}
-
-	options[kv.keys[len(kv.keys)-1]] = kv.value
-	return nil
-}
-
-func setIncludeValue(kv kvPair, options map[string]interface{}) error {
-	for i := 0; i < len(kv.keys); i++ {
-		key := kv.keys[i]
-		if optMap, ok := options[key]; ok {
-			if v, ok := optMap.(map[string]interface{}); ok {
-				options = v
-			} else {
-				return &SyntaxError{"set options value error, key " + key + " is not a map[string]interface{}", []byte{}, int64(i)}
-			}
-		} else {
-			options[key] = map[string]interface{}{}
-			options = options[key].(map[string]interface{})
-		}
-	}
-
-	kv.value.(*fileScanner).setOptions(options)
 	return nil
 }
 
