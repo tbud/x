@@ -46,7 +46,9 @@
 	"test3": {
 		"slash": {
 			"instr": "abc\t",
-			"noquote": "abc\t"
+			"noquote": "abc\t",
+			"slash1": "\"quote\" in no quote string",
+			"slash2": "abc\b\\\/\f\r\n"
 		},
 		"boolstr": {
 			"true": "true str",
@@ -59,7 +61,8 @@
 			"num1" : -0.123,
 			"num2" : 3.14e+2,
 			"num3" : 3.14e-3,
-			"num4" : 3.14e4
+			"num4" : 3.14e4,
+			"num5" : 3.14e+10
 		}
 	}
 }
