@@ -44,8 +44,16 @@
 		"empty4":null
 	},
 	"test3": {
-		"instr": {
-			"slash": "abc\t"
+		"slash": {
+			"instr": "abc\t",
+			"noquote": "abc\t"
+		},
+		"boolstr": {
+			"true": "true str",
+			"false": "false1"
+		},
+		"unicode": {
+			"str": "\u9527\uABCD\u1346"
 		}
 	}
 }

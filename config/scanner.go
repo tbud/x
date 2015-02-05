@@ -412,7 +412,7 @@ func stateBeginValue(s *fileScanner, c int) int {
 		s.bufType = bufTypeNumber
 		return scanAppendBuf
 	}
-	if unicode.IsLetter(rune(c)) {
+	if unicode.IsLetter(rune(c)) || c == '\\' {
 		s.step = stateInString
 		s.bufType = bufTypeNoQuoteString
 		return stateInString(s, c)
@@ -480,7 +480,7 @@ func stateEndValue(s *fileScanner, c int) int {
 		}
 		return s.error(c, "after array element")
 	}
-	return s.error(c, "")
+	return s.error(c, "stateEndValue, error state")
 }
 
 // stateInString is the state after reading `"`.
