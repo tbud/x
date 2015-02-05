@@ -41,6 +41,6 @@ func TestParseNormalJson(t *testing.T) {
 	compareJsonAndConfig(t, "testdata/singlefile.json", "testdata/singlefile.json")
 }
 
-func TestLoadMultiFile(t *testing.T) {
-	compareJsonAndConfig(t, "testdata/singlefile.json", "testdata/multifile.conf")
-}
+// func TestLoadMultiFile(t *testing.T) {
+// 	compareJsonAndConfig(t, "testdata/singlefile.json", "testdata/multifile.conf")
+// }

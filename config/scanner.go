@@ -64,6 +64,7 @@ type fileScanner struct {
 	keyStack     []int    // stack for key
 	parseBuf     []byte   // save parsed key or value
 	bufType      int      // buf type
+	bufInQuote   bool     // when buf type is no quote string and parse in quote then true
 	currentState int      // save current state
 	kvs          []kvPair //save key value
 }
@@ -119,6 +120,7 @@ func (s *fileScanner) init() {
 	s.err = nil
 	s.bytes = 0
 	s.currentState = parseKey
+	s.bufInQuote = false
 }
 
 // checkValid verifies that data is valid HOCON-encoded data.
@@ -147,22 +149,6 @@ func (s *fileScanner) checkValid(fileName string) error {
 			s.parseBuf = append(s.parseBuf, c)
 		}
 	}
-
-	// stateEndValue(s, '\n')
-
-	// for i := range s.includesScanner {
-	// 	scan := s.includesScanner[i]
-	// 	var checkFile string
-	// 	if filepath.IsAbs(scan.file) {
-	// 		checkFile = scan.file
-	// 	} else {
-	// 		checkFile = filepath.Join(s.dir, scan.file)
-	// 	}
-	// 	err := scan.checkValid(checkFile)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
 	return nil
 }
 
@@ -240,17 +226,28 @@ func (s *fileScanner) popKeyStack() {
 }
 
 func (s *fileScanner) pushKey() {
-	s.baseKeys = append(s.baseKeys, string(s.parseBuf))
+	switch s.checkIncludeAndLoad() {
+	case scanError:
+		panic(s.err)
+	case scanContinue:
+		s.baseKeys = append(s.baseKeys, string(s.parseBuf))
+	}
 	s.parseBuf = s.parseBuf[0:0]
+	s.bufInQuote = false
 }
 
 func (s *fileScanner) pushValue() {
-	baseKeys := make([]string, len(s.baseKeys))
-	copy(baseKeys, s.baseKeys)
-	if len(s.parseBuf) == 0 {
-		s.kvs = append(s.kvs, kvPair{baseKeys, nil})
-	} else {
-		s.kvs = append(s.kvs, kvPair{baseKeys, s.parseBufValue()})
+	switch s.checkIncludeAndLoad() {
+	case scanError:
+		panic(s.err)
+	case scanContinue:
+		baseKeys := make([]string, len(s.baseKeys))
+		copy(baseKeys, s.baseKeys)
+		if len(s.parseBuf) == 0 {
+			s.kvs = append(s.kvs, kvPair{baseKeys, nil})
+		} else {
+			s.kvs = append(s.kvs, kvPair{baseKeys, s.parseBufValue()})
+		}
 	}
 
 	// pop base key
@@ -264,6 +261,45 @@ func (s *fileScanner) pushValue() {
 	// reinit parse buf
 	s.parseBuf = s.parseBuf[0:0]
 	s.bufType = bufTypeNull
+	s.bufInQuote = false
+}
+
+const (
+	Include_Keyword = "include"
+	Include_Len     = 7
+)
+
+func (s *fileScanner) checkIncludeAndLoad() int {
+	if s.bufType == bufTypeNoQuoteString && len(s.parseBuf) > Include_Len+3 &&
+		strings.HasPrefix(string(s.parseBuf), Include_Keyword) &&
+		(s.parseBuf[Include_Len+1] == ' ' || s.parseBuf[Include_Len+1] == '\t') {
+
+		fmt.Println("include")
+		fileName := string(s.parseBuf[Include_Len+1:])
+		fileName = strings.Trim(strings.Trim(strings.Trim(fileName, " "), "\t"), "\"")
+
+		if !filepath.IsAbs(fileName) {
+			fileName = filepath.Join(s.dir, fileName)
+		}
+
+		scan := fileScanner{}
+		err := scan.checkValid(fileName)
+		if err == nil {
+			for i := range scan.kvs {
+				kv := scan.kvs[i]
+				basekeys := make([]string, len(s.baseKeys)+len(kv.keys))
+				copy(basekeys, s.baseKeys)
+				basekeys = append(basekeys, kv.keys...)
+				s.kvs = append(s.kvs, kvPair{basekeys, kv.value})
+			}
+		} else {
+			s.step = stateError
+			s.err = s.errorSyntax("error in load include: " + string(s.parseBuf))
+			return scanError
+		}
+		return scanSkipSpace
+	}
+	return scanContinue
 }
 
 func (s *fileScanner) pushArrayKey() {
@@ -483,7 +519,16 @@ func stateInString(s *fileScanner, c int) int {
 	if s.bufType == bufTypeNoQuoteString {
 		if s.currentState == parseKey {
 			switch c {
-			case '.', '=', ':', '{', '\r', '\n', '#':
+			case '"':
+				s.bufInQuote = !s.bufInQuote
+				return scanAppendBuf
+			case '.', ':':
+				if !s.bufInQuote {
+					s.trimParseBuf()
+					return stateEndValue(s, c)
+				}
+				return scanAppendBuf
+			case '=', '{', '\r', '\n', '#':
 				s.trimParseBuf()
 				return stateEndValue(s, c)
 			}
