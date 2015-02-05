@@ -237,6 +237,10 @@ func (s *fileScanner) pushKey() {
 }
 
 func (s *fileScanner) pushValue() {
+	if len(s.baseKeys) == 0 {
+		return
+	}
+
 	switch s.checkIncludeAndLoad() {
 	case scanError:
 		panic(s.err)
@@ -272,9 +276,8 @@ const (
 func (s *fileScanner) checkIncludeAndLoad() int {
 	if s.bufType == bufTypeNoQuoteString && len(s.parseBuf) > Include_Len+3 &&
 		strings.HasPrefix(string(s.parseBuf), Include_Keyword) &&
-		(s.parseBuf[Include_Len+1] == ' ' || s.parseBuf[Include_Len+1] == '\t') {
+		(s.parseBuf[Include_Len] == ' ' || s.parseBuf[Include_Len] == '\t') {
 
-		fmt.Println("include")
 		fileName := string(s.parseBuf[Include_Len+1:])
 		fileName = strings.Trim(strings.Trim(strings.Trim(fileName, " "), "\t"), "\"")
 
@@ -287,8 +290,8 @@ func (s *fileScanner) checkIncludeAndLoad() int {
 		if err == nil {
 			for i := range scan.kvs {
 				kv := scan.kvs[i]
-				basekeys := make([]string, len(s.baseKeys)+len(kv.keys))
-				copy(basekeys, s.baseKeys)
+				basekeys := []string{}
+				basekeys = append(basekeys, s.baseKeys...)
 				basekeys = append(basekeys, kv.keys...)
 				s.kvs = append(s.kvs, kvPair{basekeys, kv.value})
 			}
