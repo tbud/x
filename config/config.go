@@ -101,6 +101,12 @@ func (c *Config) BoolDefault(key string, defaultValue bool) bool {
 }
 
 func (c *Config) SubOptions(key string) *Config {
+	result := c.getValue(key)
+	if result != nil {
+		if value, ok := result.(map[string]interface{}); ok {
+			return &Config{value}
+		}
+	}
 	return nil
 }
 

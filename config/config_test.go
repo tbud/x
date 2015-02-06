@@ -53,6 +53,18 @@ func TestLoadNotExistFile(t *testing.T) {
 	}
 }
 
+func TestScannerError(t *testing.T) {
+	_, err := Load("testdata/scanerr.conf")
+	if err != nil && !strings.HasPrefix(err.Error(), "invalid character '\"'") {
+		t.Error(err)
+	}
+
+	_, err = Load("testdata/scanerr1.conf")
+	if err != nil && !strings.HasPrefix(err.Error(), "invalid character '+'") {
+		t.Error(err)
+	}
+}
+
 func TestConfigGetInt(t *testing.T) {
 	conf, err := Load("testdata/multifile.conf")
 	if err != nil {
@@ -147,4 +159,42 @@ func TestConfigGetBoolDefault(t *testing.T) {
 	if conf.BoolDefault("test1.ok1", false) != false {
 		t.Error("get bool default error")
 	}
+}
+
+func TestConfigSubOptions(t *testing.T) {
+	conf, err := Load("testdata/multifile.conf")
+	if err != nil {
+		t.Error(err)
+	}
+
+	subConf := conf.SubOptions("test1")
+	if subConf == nil {
+		t.Error("get sub option test1 error")
+	}
+
+	if subConf.BoolDefault("ok", false) != true {
+		t.Error("get bool default error")
+	}
+
+	if subConf.BoolDefault(".ok1", false) != false {
+		t.Error("get bool default error")
+	}
+}
+
+func TestConfigSubOptionsNotExist(t *testing.T) {
+	conf, err := Load("testdata/multifile.conf")
+	if err != nil {
+		t.Error(err)
+	}
+
+	subConf := conf.SubOptions("test1.tttt")
+	if subConf != nil {
+		t.Error("get sub option test1.tttt error")
+	}
+
+	subConf = conf.SubOptions("test1.num")
+	if subConf != nil {
+		t.Error("get sub option test1.tttt error")
+	}
+
 }
