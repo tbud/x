@@ -4,6 +4,7 @@ import (
 	"github.com/tbud/x/encoding/json"
 	"io/ioutil"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -43,6 +44,13 @@ func TestParseNormalJson(t *testing.T) {
 
 func TestLoadMultiFile(t *testing.T) {
 	compareJsonAndConfig(t, "testdata/singlefile.json", "testdata/multifile.conf")
+}
+
+func TestLoadNotExistFile(t *testing.T) {
+	_, err := Load("testdata/includenoexistfile.conf")
+	if err != nil && !strings.HasPrefix(err.Error(), "error in load include:") {
+		t.Error(err)
+	}
 }
 
 func TestConfigGetInt(t *testing.T) {
