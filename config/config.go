@@ -1,23 +1,16 @@
 package config
 
 import (
+	// "fmt"
 	"path/filepath"
+	// "reflect"
 	"runtime"
+	"strings"
 )
 
 type Config struct {
 	options map[string]interface{}
 }
-
-// type ConfigError struct {
-// 	file   string
-// 	offset int
-// 	err    error
-// }
-
-// func (e *ConfigError) Error() string {
-// 	return "config file " + e.err.Error()
-// }
 
 func Load(fileName string) (config Config, err error) {
 	defer func() {
@@ -49,39 +42,88 @@ func Load(fileName string) (config Config, err error) {
 }
 
 func (c *Config) Int(key string) (result int, found bool) {
-	return 0, false
+	result, found = 0, false
+	value := c.getValue(key)
+	if value == nil {
+		return
+	}
+
+	if retFloat, ok := value.(float64); ok {
+		return int(retFloat), ok
+	}
+	return
 }
 
 func (c *Config) IntDefault(key string, defaultValue int) int {
-	return defaultValue
+	result, found := c.Int(key)
+	if !found {
+		result = defaultValue
+	}
+	return result
 }
 
 func (c *Config) String(key string) (result string, found bool) {
-	return "", false
+	result, found = "", false
+	value := c.getValue(key)
+	if value == nil {
+		return
+	}
+
+	result, found = value.(string)
+	return
 }
 
 func (c *Config) StringDefault(key, defaultValue string) string {
-	return defaultValue
+	result, found := c.String(key)
+	if !found {
+		result = defaultValue
+	}
+	return result
 }
 
 func (c *Config) Bool(key string) (result, found bool) {
-	return false, false
+	result, found = false, false
+	value := c.getValue(key)
+	if value == nil {
+		return
+	}
+
+	result, found = value.(bool)
+	return
 }
 
 func (c *Config) BoolDefault(key string, defaultValue bool) bool {
-	return defaultValue
+	result, found := c.Bool(key)
+	if !found {
+		result = defaultValue
+	}
+	return result
 }
 
 func (c *Config) SubOptions(key string) *Config {
 	return nil
 }
 
-// func (c *Config) include(p map[string]interface{}, fileName string) {
-// 	includeFile := filepath.Join(c.fileDir, fileName)
-// 	buf, err := ioutil.ReadFile(includeFile)
-// 	if err != nil {
-// 		panic(&ConfigError{err})
-// 	}
+func (c *Config) getValue(key string) interface{} {
+	if len(key) == 0 {
+		return nil
+	}
+	ops := c.options
 
-// 	scan := scanner{data: buf}
-// }
+	keys := strings.Split(key, ".")
+	lastkeyIndex := len(keys) - 1
+	for i := range keys {
+		if value, ok := ops[keys[i]]; ok {
+			if i == lastkeyIndex {
+				return value
+			} else {
+				if ops, ok = value.(map[string]interface{}); !ok {
+					return nil
+				}
+			}
+		} else {
+			return nil
+		}
+	}
+	return nil
+}

@@ -10,10 +10,8 @@ package config
 // before diving into the scanner itself.
 
 import (
-	"fmt"
 	"io/ioutil"
 	"path/filepath"
-	"reflect"
 	"strconv"
 	"strings"
 	"unicode"
@@ -167,7 +165,6 @@ func (s *fileScanner) setOptions(options map[string]interface{}) error {
 				if v, ok := optMap.(map[string]interface{}); ok {
 					ops = v
 				} else {
-					fmt.Println(kv.keys, reflect.TypeOf(optMap))
 					return &SyntaxError{"set options value error, key " + key + " is not a map[string]interface{}", []byte{}, int64(i)}
 				}
 			} else {
