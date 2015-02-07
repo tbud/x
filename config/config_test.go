@@ -97,6 +97,38 @@ func TestConfigGetIntDefault(t *testing.T) {
 	}
 }
 
+func TestConfigGetFloat(t *testing.T) {
+	conf, err := Load("testdata/multifile.conf")
+	if err != nil {
+		t.Error(err)
+	}
+
+	// test get ok
+	if get, ok := conf.Float("test1.cover.fnum"); !ok || get != 12.58 {
+		t.Errorf("get test1.num float value, want 12.58 get %d, %v", get, ok)
+	}
+
+	// test get error
+	if get, ok := conf.Float("test1.num1"); ok || get != 0 {
+		t.Error("get test1.num1 float value, not error")
+	}
+}
+
+func TestConfigGetFloatDefault(t *testing.T) {
+	conf, err := Load("testdata/multifile.conf")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if conf.FloatDefault("test1.cover.fnum", 5.5) != 12.58 {
+		t.Error("get int default error")
+	}
+
+	if conf.FloatDefault("test1.num1", 5.5) != 5.5 {
+		t.Error("get int default error")
+	}
+}
+
 func TestConfigGetString(t *testing.T) {
 	conf, err := Load("testdata/multifile.conf")
 	if err != nil {
@@ -105,7 +137,7 @@ func TestConfigGetString(t *testing.T) {
 
 	// test get ok
 	if get, ok := conf.String("test1.comment"); !ok || get != "#" {
-		t.Errorf("get test1.num string value, want 1 get %s, %v", get, ok)
+		t.Errorf("get test1.num string value, want '#' get %s, %v", get, ok)
 	}
 
 	// test get error
@@ -137,7 +169,7 @@ func TestConfigGetBool(t *testing.T) {
 
 	// test get ok
 	if get, ok := conf.Bool("test1.ok"); !ok || get != true {
-		t.Errorf("get test1.num bool value, want 1 get %v, %v", get, ok)
+		t.Errorf("get test1.num bool value, want true get %v, %v", get, ok)
 	}
 
 	// test get error

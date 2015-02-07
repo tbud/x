@@ -62,6 +62,25 @@ func (c *Config) IntDefault(key string, defaultValue int) int {
 	return result
 }
 
+func (c *Config) Float(key string) (result float64, found bool) {
+	result, found = 0.0, false
+	value := c.getValue(key)
+	if value == nil {
+		return
+	}
+
+	result, found = value.(float64)
+	return
+}
+
+func (c *Config) FloatDefault(key string, defaultValue float64) float64 {
+	result, found := c.Float(key)
+	if !found {
+		result = defaultValue
+	}
+	return result
+}
+
 func (c *Config) String(key string) (result string, found bool) {
 	result, found = "", false
 	value := c.getValue(key)
