@@ -23,7 +23,7 @@ func BenchmarkFastmodeDebug(b *testing.B) {
 		b.Error(err)
 	}
 
-	logger, err := New(&conf)
+	logger, err := New(conf)
 	if err != nil {
 		b.Error(err)
 		return
@@ -38,13 +38,14 @@ func TestDebug(t *testing.T) {
 	conf, err := config.Load("log.conf")
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
-	logger, err1 := New(&conf)
+	logger, err1 := New(conf)
 	if err1 != nil {
 		t.Error(err1)
 		return
 	}
 
-	logger.Debug("py test console")
+	logger.Error("py test console")
 }

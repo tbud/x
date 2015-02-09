@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -10,7 +11,7 @@ type Config struct {
 	options map[string]interface{}
 }
 
-func Load(fileName string) (config Config, err error) {
+func Load(fileName string) (config *Config, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if _, ok := r.(runtime.Error); ok {
@@ -20,7 +21,7 @@ func Load(fileName string) (config Config, err error) {
 		}
 	}()
 
-	config = Config{map[string]interface{}{}}
+	config = &Config{map[string]interface{}{}}
 	scan := fileScanner{}
 
 	if !filepath.IsAbs(fileName) {
@@ -124,7 +125,14 @@ func (c *Config) Strings(key string) (result []string, found bool) {
 		return
 	}
 
-	result, found = value.([]string)
+	if infs, f := value.([]interface{}); f {
+		for i := range infs {
+			if v, ok := infs[i].(string); ok {
+				found = true
+				result = append(result, v)
+			}
+		}
+	}
 	return
 }
 
@@ -151,6 +159,9 @@ func (c *Config) SubConfig(key string) *Config {
 }
 
 func (c *Config) EachSubConfig(fun func(key string, conf *Config) error) error {
+	if c == nil {
+		return errors.New("Config is nil")
+	}
 	for key, value := range c.options {
 		err := fun(key, subConfig(value))
 		if err != nil {
@@ -161,11 +172,14 @@ func (c *Config) EachSubConfig(fun func(key string, conf *Config) error) error {
 }
 
 func (c *Config) KeyLen() int {
+	if c == nil {
+		return 0
+	}
 	return len(c.options)
 }
 
 func (c *Config) getValue(key string) interface{} {
-	if len(key) == 0 {
+	if len(key) == 0 || c == nil {
 		return nil
 	}
 	ops := c.options

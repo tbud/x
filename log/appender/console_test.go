@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	confInited     config.Config
+	confInited     *config.Config
 	appenderInited Appender
 	msgInited      = LogMsg{Msg: "hello py", Date: time.Now()}
 )
@@ -23,7 +23,7 @@ func init() {
 
 	confInited = conf
 
-	appender, err := consoleAppender(&confInited)
+	appender, err := consoleAppender(confInited)
 	if err != nil {
 		return
 	}
@@ -43,7 +43,7 @@ func BenchmarkConsole(b *testing.B) {
 		b.Error(err)
 	}
 
-	appender, err := consoleAppender(&conf)
+	appender, err := consoleAppender(conf)
 	if err != nil {
 		b.Error(err)
 	}
