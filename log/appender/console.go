@@ -6,17 +6,24 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 )
 
 type ConsoleAppender struct {
+	sync.Mutex
 	out   io.Writer
 	templ *template.Template
 }
 
 func (c *ConsoleAppender) Append(m *LogMsg) error {
-	return c.templ.Execute(c.out, m)
+	// return c.templ.Execute(c.out, m)
+	msg := m.Date.Format("060102 15:04:05.000") + m.Msg
+	c.Lock()
+	c.out.Write([]byte(msg))
+	c.Unlock()
+	return nil
 }
 
 func fdate(layout string, date *time.Time) string {

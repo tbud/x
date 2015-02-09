@@ -4,6 +4,7 @@ import (
 	"github.com/tbud/x/config"
 	"io/ioutil"
 	"log"
+	"os"
 	"testing"
 	"time"
 )
@@ -54,10 +55,15 @@ func BenchmarkConsole(b *testing.B) {
 }
 
 func BenchmarkLog(b *testing.B) {
-	trace := log.New(ioutil.Discard, "TRACE ", log.Ldate|log.Ltime|log.Llongfile)
+	trace := log.New(ioutil.Discard, "TRACE1 ", log.Ldate|log.Ltime|log.Lmicroseconds)
 	for i := 0; i < b.N; i++ {
 		trace.Println("hello py")
 	}
+}
+
+func TestLog(t *testing.T) {
+	trace := log.New(os.Stdout, "TRACE ", log.Ldate|log.Ltime|log.Lmicroseconds)
+	trace.Println("hello py")
 }
 
 func BenchmarkNewTime(b *testing.B) {

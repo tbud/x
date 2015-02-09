@@ -68,18 +68,6 @@ func (l *Logger) SetLevel(level int) {
 	}
 }
 
-func (l *Logger) output(level int, format string, v ...interface{}) {
-	if l.fastMode {
-		for i := range l.rootAppenders {
-			msg := appender.LogMsg{Date: time.Now()}
-			msg.Msg = fmt.Sprintf(format, v...)
-			l.rootAppenders[i].Append(&msg)
-		}
-	} else {
-		// TODO detail mode
-	}
-}
-
 func (l *Logger) Emergency(format string, v ...interface{}) {
 	if l.level >= LevelEmergency {
 		l.output(LevelEmergency, format, v...)
@@ -167,4 +155,16 @@ func (l *Logger) loadAppenders(conf *config.Config) error {
 		})
 	}
 	return nil
+}
+
+func (l *Logger) output(level int, format string, v ...interface{}) {
+	if l.fastMode {
+		for i := range l.rootAppenders {
+			msg := appender.LogMsg{Date: time.Now()}
+			msg.Msg = fmt.Sprintf(format, v...)
+			l.rootAppenders[i].Append(&msg)
+		}
+	} else {
+		// TODO detail mode
+	}
 }
