@@ -117,14 +117,51 @@ func (c *Config) BoolDefault(key string, defaultValue bool) bool {
 	return result
 }
 
-func (c *Config) SubOptions(key string) *Config {
-	result := c.getValue(key)
-	if result != nil {
-		if value, ok := result.(map[string]interface{}); ok {
-			return &Config{value}
+func (c *Config) Strings(key string) (result []string, found bool) {
+	result, found = []string{}, false
+	value := c.getValue(key)
+	if value == nil {
+		return
+	}
+
+	result, found = value.([]string)
+	return
+}
+
+func (c *Config) StringsDefault(key string, defaultValue []string) []string {
+	result, found := c.Strings(key)
+	if !found {
+		result = defaultValue
+	}
+	return result
+}
+
+func subConfig(value interface{}) *Config {
+	if value != nil {
+		if v, ok := value.(map[string]interface{}); ok {
+			return &Config{v}
 		}
 	}
 	return nil
+}
+
+func (c *Config) SubConfig(key string) *Config {
+	result := c.getValue(key)
+	return subConfig(result)
+}
+
+func (c *Config) EachSubConfig(fun func(key string, conf *Config) error) error {
+	for key, value := range c.options {
+		err := fun(key, subConfig(value))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Config) KeyLen() int {
+	return len(c.options)
 }
 
 func (c *Config) getValue(key string) interface{} {

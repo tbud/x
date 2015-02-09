@@ -193,13 +193,13 @@ func TestConfigGetBoolDefault(t *testing.T) {
 	}
 }
 
-func TestConfigSubOptions(t *testing.T) {
+func TestConfigSubConfig(t *testing.T) {
 	conf, err := Load("testdata/multifile.conf")
 	if err != nil {
 		t.Error(err)
 	}
 
-	subConf := conf.SubOptions("test1")
+	subConf := conf.SubConfig("test1")
 	if subConf == nil {
 		t.Error("get sub option test1 error")
 	}
@@ -213,18 +213,18 @@ func TestConfigSubOptions(t *testing.T) {
 	}
 }
 
-func TestConfigSubOptionsNotExist(t *testing.T) {
+func TestConfigSubConfigNotExist(t *testing.T) {
 	conf, err := Load("testdata/multifile.conf")
 	if err != nil {
 		t.Error(err)
 	}
 
-	subConf := conf.SubOptions("test1.tttt")
+	subConf := conf.SubConfig("test1.tttt")
 	if subConf != nil {
 		t.Error("get sub option test1.tttt error")
 	}
 
-	subConf = conf.SubOptions("test1.num")
+	subConf = conf.SubConfig("test1.num")
 	if subConf != nil {
 		t.Error("get sub option test1.tttt error")
 	}

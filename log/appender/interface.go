@@ -34,7 +34,7 @@ func Register(name string, appenderMaker AppenderMaker) {
 	appenderMakers[name] = appenderMaker
 }
 
-func MakeAppender(name string, conf *config.Config) (appender Appender, err error) {
+func New(name string, conf *config.Config) (appender Appender, err error) {
 	if appenderMaker, ok := appenderMakers[name]; ok {
 		appender, err = appenderMaker(conf)
 		return

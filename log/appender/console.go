@@ -16,9 +16,7 @@ type ConsoleAppender struct {
 }
 
 func (c *ConsoleAppender) Append(m *LogMsg) error {
-	// return c.templ.Execute(c.out, m)
-	c.out.Write([]byte("hello py"))
-	return nil
+	return c.templ.Execute(c.out, m)
 }
 
 func fdate(layout string, date *time.Time) string {
