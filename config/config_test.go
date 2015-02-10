@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"github.com/tbud/x/encoding/json"
 	"io/ioutil"
 	"reflect"
@@ -161,6 +162,38 @@ func TestConfigGetStringDefault(t *testing.T) {
 	}
 }
 
+func TestConfigGetStrings(t *testing.T) {
+	conf, err := Load("testdata/multifile.conf")
+	if err != nil {
+		t.Error(err)
+	}
+
+	// test get ok
+	if get, ok := conf.Strings("test2.mylist"); !ok || !reflect.DeepEqual(get, []string{"1", "2", "3"}) {
+		t.Errorf("get test1.num strings value, want [1,2,3] get %s, %v", get, ok)
+	}
+
+	// test get error
+	if get, ok := conf.Strings("test2.mylist1"); ok || !reflect.DeepEqual(get, []string{}) {
+		t.Error("get test1.num1 strings value, not error")
+	}
+}
+
+func TestConfigGetStringsDefault(t *testing.T) {
+	conf, err := Load("testdata/multifile.conf")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !reflect.DeepEqual(conf.StringsDefault("test2.mylist", []string{"1", "2"}), []string{"1", "2", "3"}) {
+		t.Error("get strings default error")
+	}
+
+	if !reflect.DeepEqual(conf.StringsDefault("test2.mylist1", []string{"1", "2", "3"}), []string{"1", "2", "3"}) {
+		t.Error("get strings default error")
+	}
+}
+
 func TestConfigGetBool(t *testing.T) {
 	conf, err := Load("testdata/multifile.conf")
 	if err != nil {
@@ -227,6 +260,30 @@ func TestConfigSubConfigNotExist(t *testing.T) {
 	subConf = conf.SubConfig("test1.num")
 	if subConf != nil {
 		t.Error("get sub option test1.tttt error")
+	}
+}
+
+func TestConfigEachAndKeyLen(t *testing.T) {
+	conf, err := Load("testdata/multifile.conf")
+	if err != nil {
+		t.Error(err)
+	}
+
+	subConf := conf.SubConfig("test3.nums")
+
+	if subConf.KeyLen() > 0 {
+		err := subConf.EachSubConfig(func(key string, conf *Config) error {
+			if !strings.HasPrefix(key, "num") {
+				return errors.New("unaccept key in each config test: " + key)
+			}
+			return nil
+		})
+
+		if err != nil {
+			t.Error(err)
+		}
+	} else {
+		t.Error("load file error")
 	}
 
 }
