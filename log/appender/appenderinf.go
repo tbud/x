@@ -29,7 +29,8 @@ func Register(name string, appenderMaker AppenderMaker) {
 	appenderMakers[name] = appenderMaker
 }
 
-func New(name string, conf *config.Config) (appender Appender, err error) {
+func New(conf *config.Config) (appender Appender, err error) {
+	name := conf.StringDefault("type", "Console")
 	if appenderMaker, ok := appenderMakers[name]; ok {
 		appender, err = appenderMaker(conf)
 		return

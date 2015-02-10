@@ -104,7 +104,7 @@ func (l *Logger) initRoot(conf *config.Config) error {
 
 func (l *Logger) loadAppenders(conf *config.Config) error {
 	if conf == nil || conf.KeyLen() == 0 {
-		appender, err := appender.New("Console", nil)
+		appender, err := appender.New(nil)
 		if err != nil {
 			panic("Load default appender error: " + err.Error())
 		}
@@ -112,16 +112,12 @@ func (l *Logger) loadAppenders(conf *config.Config) error {
 		l.appenders["console"] = appender
 	} else {
 		return conf.EachSubConfig(func(key string, subConf *config.Config) error {
-			if appenderType, ok := subConf.String("type"); ok {
-				appender, err := appender.New(appenderType, subConf)
-				if err != nil {
-					return err
-				}
-
-				l.appenders[key] = appender
-			} else {
-				return errors.New("appender without type can't init. Appender name: " + key)
+			appender, err := appender.New(subConf)
+			if err != nil {
+				return errors.New("Load appender " + key + " error: " + err.Error())
 			}
+
+			l.appenders[key] = appender
 			return nil
 		})
 	}
