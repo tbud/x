@@ -16,6 +16,7 @@ type PatternLayout struct {
 	step             func(*PatternLayout, int) int
 	needFile         bool
 	needTime         bool
+	tempBuf          []byte
 }
 
 const (
@@ -140,8 +141,21 @@ func (p *PatternLayout) parse() error {
 
 	for _, segment := range p.segments {
 		switch segment.patternType {
-		case patternYear, patternMonth, patternDay, patternHour,
-			patternMin, patternSec, patternNanoSec:
+		case patternYear:
+			if !(segment.segLen == 2 || segment.segLen == 4) {
+				return errors.New("year must 2 or 4 len.")
+			}
+			p.needTime = true
+		case patternNanoSec:
+			if segment.segLen < 3 || segment.segLen > 9 {
+				return errors.New("nano second must 3 to 9 len.")
+			}
+			p.needTime = true
+		case patternMonth, patternDay, patternHour,
+			patternMin, patternSec:
+			if segment.segLen != 2 {
+				return errors.New("month, day, hour, min, sec must 2 len.")
+			}
 			p.needTime = true
 		case patternLongFile, patternShortFile, patternLine:
 			p.needFile = true
@@ -162,13 +176,15 @@ func (p *PatternLayout) Format(buf *[]byte, m *LogMsg) error {
 		p.min = min
 		p.sec = sec
 
-		p.nanoSec = m.Date.Nanosecond() / 1e3
+		p.nanoSec = m.Date.Nanosecond()
 	}
 
 	for _, segment := range p.segments {
 		switch segment.patternType {
 		case patternYear:
-			itoa(buf, p.year, 2)
+			p.tempBuf = p.tempBuf[:0]
+			itoa(&p.tempBuf, p.year, 4)
+			*buf = append(*buf, p.tempBuf[4-segment.segLen:]...)
 		case patternMonth:
 			itoa(buf, p.month, 2)
 		case patternDay:
@@ -180,7 +196,9 @@ func (p *PatternLayout) Format(buf *[]byte, m *LogMsg) error {
 		case patternSec:
 			itoa(buf, p.sec, 2)
 		case patternNanoSec:
-			itoa(buf, p.nanoSec, 6)
+			p.tempBuf = p.tempBuf[:0]
+			itoa(&p.tempBuf, p.nanoSec, 9)
+			*buf = append(*buf, p.tempBuf[0:segment.segLen]...)
 		case patternLongFile:
 			*buf = append(*buf, m.File...)
 		case patternShortFile:

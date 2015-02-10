@@ -154,11 +154,11 @@ type pcFileLineMap struct {
 }
 
 func (p *pcFileLineMap) getFileLine() (file string, line int) {
-	var rpc [5]uintptr
-	runtime.Callers(0, rpc[:])
+	var rpc [2]uintptr
+	runtime.Callers(3, rpc[:])
 
 	p.RLock()
-	v, ok := p.m[rpc[4]]
+	v, ok := p.m[rpc[1]]
 	p.RUnlock()
 
 	if ok {
