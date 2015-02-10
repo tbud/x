@@ -2,6 +2,7 @@ package appender
 
 import (
 	"github.com/tbud/x/config"
+	"github.com/tbud/x/log/common"
 	"io/ioutil"
 	"log"
 	"os"
@@ -12,7 +13,7 @@ import (
 var (
 	confInited     *config.Config
 	appenderInited Appender
-	msgInited      = LogMsg{Msg: "hello py", Date: time.Now()}
+	msgInited      = common.LogMsg{Msg: "hello py", Date: time.Now()}
 )
 
 func init() {
@@ -49,13 +50,13 @@ func BenchmarkConsole(b *testing.B) {
 	}
 
 	for i := 0; i < b.N; i++ {
-		m := LogMsg{Msg: "hello py", Date: time.Now()}
+		m := common.LogMsg{Msg: "hello py", Date: time.Now()}
 		appender.Append(&m)
 	}
 }
 
 func BenchmarkLog(b *testing.B) {
-	trace := log.New(ioutil.Discard, "TRACE1 ", log.Ldate|log.Ltime|log.Lmicroseconds)
+	trace := log.New(ioutil.Discard, "TRACE1 ", log.Ldate|log.Ltime|log.Lmicroseconds|log.Llongfile)
 	for i := 0; i < b.N; i++ {
 		trace.Println("hello py")
 	}
@@ -68,7 +69,7 @@ func TestLog(t *testing.T) {
 
 func BenchmarkNewTime(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		m := LogMsg{Msg: "hello py", Date: time.Now()}
+		m := common.LogMsg{Msg: "hello py", Date: time.Now()}
 		ioutil.Discard.Write([]byte(m.Msg))
 	}
 }
@@ -85,6 +86,6 @@ func TestConsole(t *testing.T) {
 		t.Error(err)
 	}
 
-	m := LogMsg{Msg: "hello py: test console", Date: time.Now()}
+	m := common.LogMsg{Msg: "hello py: test console", Date: time.Now()}
 	appender.Append(&m)
 }

@@ -3,18 +3,13 @@ package appender
 import (
 	"errors"
 	"github.com/tbud/x/config"
-	"time"
+	"github.com/tbud/x/log/common"
 )
 
-type LogMsg struct {
-	File string
-	Line int
-	Msg  string
-	Date time.Time
-}
-
 type Appender interface {
-	Append(m *LogMsg) error
+	Append(m *common.LogMsg) error
+	NeedFile() bool
+	NeedTime() bool
 }
 
 type AppenderMaker func(conf *config.Config) (Appender, error)

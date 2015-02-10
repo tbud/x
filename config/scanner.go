@@ -156,8 +156,7 @@ func (s *fileScanner) checkValid(fileName string) error {
 }
 
 func (s *fileScanner) setOptions(options map[string]interface{}) error {
-	for i := range s.kvs {
-		kv := s.kvs[i]
+	for _, kv := range s.kvs {
 		ops := options
 		for i := 0; i < len(kv.keys)-1; i++ {
 			key := kv.keys[i]
@@ -259,8 +258,7 @@ func (s *fileScanner) checkIncludeAndLoad() int {
 		scan := fileScanner{}
 		err := scan.checkValid(fileName)
 		if err == nil {
-			for i := range scan.kvs {
-				kv := scan.kvs[i]
+			for _, kv := range scan.kvs {
 				basekeys := []string{}
 				basekeys = append(basekeys, s.baseKeys...)
 				basekeys = append(basekeys, kv.keys...)
@@ -869,8 +867,8 @@ var keywords = keywordScanner{
 }
 
 func (k *keywordScanner) init() {
-	for i := range k.keywords {
-		wordLen := len(k.keywords[i])
+	for _, keyword := range k.keywords {
+		wordLen := len(keyword)
 		if wordLen > k.maxWordLen {
 			k.maxWordLen = wordLen
 		}
@@ -880,8 +878,8 @@ func (k *keywordScanner) init() {
 func (k *keywordScanner) checkKeyword(s *fileScanner, buf []byte) {
 	if len(buf) <= k.maxWordLen {
 		value := string(buf)
-		for i := range k.keywords {
-			if value == k.keywords[i] {
+		for i, keyword := range k.keywords {
+			if value == keyword {
 				s.bufType = k.keywordsType[i]
 				return
 			}

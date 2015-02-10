@@ -126,8 +126,8 @@ func (c *Config) Strings(key string) (result []string, found bool) {
 	}
 
 	if infs, f := value.([]interface{}); f {
-		for i := range infs {
-			if v, ok := infs[i].(string); ok {
+		for _, inf := range infs {
+			if v, ok := inf.(string); ok {
 				found = true
 				result = append(result, v)
 			}
@@ -186,8 +186,8 @@ func (c *Config) getValue(key string) interface{} {
 
 	keys := strings.Split(key, ".")
 	lastkeyIndex := len(keys) - 1
-	for i := range keys {
-		if value, ok := ops[keys[i]]; ok {
+	for i, key := range keys {
+		if value, ok := ops[key]; ok {
 			if i == lastkeyIndex {
 				return value
 			} else {

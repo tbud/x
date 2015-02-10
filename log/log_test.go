@@ -47,5 +47,7 @@ func TestDebug(t *testing.T) {
 		return
 	}
 
-	logger.Error("py test console")
+	for i := 0; i < 2; i++ {
+		logger.Error("py test console")
+	}
 }

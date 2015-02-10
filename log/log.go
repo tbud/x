@@ -5,45 +5,19 @@ import (
 	"fmt"
 	"github.com/tbud/x/config"
 	"github.com/tbud/x/log/appender"
-	"strings"
+	. "github.com/tbud/x/log/common"
+	"runtime"
+	"sync"
 	"time"
 )
-
-// RFC5424 log message levels.
-const (
-	LevelEmergency = iota
-	LevelAlert
-	LevelCritical
-	LevelError
-	LevelWarning
-	LevelNotice
-	LevelInformational
-	LevelDebug
-)
-
-var logConfLevels = map[string]int{
-	"emergency": LevelEmergency,
-	"alert":     LevelAlert,
-	"critical":  LevelCritical,
-	"error":     LevelError,
-	"warn":      LevelWarning,
-	"notice":    LevelNotice,
-	"info":      LevelInformational,
-	"debug":     LevelDebug,
-}
 
 type Logger struct {
 	fastMode      bool
 	level         int
 	rootAppenders []appender.Appender
 	appenders     map[string]appender.Appender
-}
-
-func stringToLogLevel(name string) int {
-	if ret, ok := logConfLevels[strings.ToLower(name)]; ok {
-		return ret
-	}
-	return LevelError
+	needFile      bool
+	needTime      bool
 }
 
 func New(conf *config.Config) (*Logger, error) {
@@ -63,26 +37,14 @@ func New(conf *config.Config) (*Logger, error) {
 }
 
 func (l *Logger) SetLevel(level int) {
-	if level >= LevelEmergency && level <= LevelDebug {
+	if level >= LevelFatal && level <= LevelTrace {
 		l.level = level
 	}
 }
 
-func (l *Logger) Emergency(format string, v ...interface{}) {
-	if l.level >= LevelEmergency {
-		l.output(LevelEmergency, format, v...)
-	}
-}
-
-func (l *Logger) Alert(format string, v ...interface{}) {
-	if l.level >= LevelAlert {
-		l.output(LevelAlert, format, v...)
-	}
-}
-
-func (l *Logger) Critical(format string, v ...interface{}) {
-	if l.level >= LevelCritical {
-		l.output(LevelCritical, format, v...)
+func (l *Logger) Fatal(format string, v ...interface{}) {
+	if l.level >= LevelFatal {
+		l.output(LevelFatal, format, v...)
 	}
 }
 
@@ -93,20 +55,14 @@ func (l *Logger) Error(format string, v ...interface{}) {
 }
 
 func (l *Logger) Warn(format string, v ...interface{}) {
-	if l.level >= LevelWarning {
-		l.output(LevelWarning, format, v...)
-	}
-}
-
-func (l *Logger) Notice(format string, v ...interface{}) {
-	if l.level >= LevelNotice {
-		l.output(LevelNotice, format, v...)
+	if l.level >= LevelWarn {
+		l.output(LevelWarn, format, v...)
 	}
 }
 
 func (l *Logger) Info(format string, v ...interface{}) {
-	if l.level >= LevelInformational {
-		l.output(LevelInformational, format, v...)
+	if l.level >= LevelInfo {
+		l.output(LevelInfo, format, v...)
 	}
 }
 
@@ -116,16 +72,31 @@ func (l *Logger) Debug(format string, v ...interface{}) {
 	}
 }
 
+func (l *Logger) Trace(format string, v ...interface{}) {
+	if l.level >= LevelTrace {
+		l.output(LevelTrace, format, v...)
+	}
+}
+
 func (l *Logger) initRoot(conf *config.Config) error {
 	l.fastMode = conf.BoolDefault("fastmode", true)
-	l.level = stringToLogLevel(conf.StringDefault("level", "error"))
+	l.level = LogStringToLevel(conf.StringDefault("level", "error"))
 
 	appenderRefs := conf.StringsDefault("appendrefs", []string{"console"})
-	for i := range appenderRefs {
-		if appender, ok := l.appenders[appenderRefs[i]]; ok {
+	for _, appenderRef := range appenderRefs {
+		if appender, ok := l.appenders[appenderRef]; ok {
 			l.rootAppenders = append(l.rootAppenders, appender)
 		} else {
-			return errors.New("appender " + appenderRefs[i] + " not exist for root init.")
+			return errors.New("appender " + appenderRef + " not exist for root init.")
+		}
+	}
+
+	for _, appender := range l.rootAppenders {
+		if appender.NeedFile() {
+			l.needFile = true
+		}
+		if appender.NeedTime() {
+			l.needTime = true
 		}
 	}
 	return nil
@@ -159,12 +130,55 @@ func (l *Logger) loadAppenders(conf *config.Config) error {
 
 func (l *Logger) output(level int, format string, v ...interface{}) {
 	if l.fastMode {
+		msg := LogMsg{Level: level, Msg: fmt.Sprintf(format, v...)}
+		if l.needTime {
+			msg.Date = time.Now()
+		}
+		if l.needFile {
+			msg.File, msg.Line = pcFileLineMaps.getFileLine()
+		}
 		for i := range l.rootAppenders {
-			msg := appender.LogMsg{Date: time.Now()}
-			msg.Msg = fmt.Sprintf(format, v...)
 			l.rootAppenders[i].Append(&msg)
 		}
 	} else {
 		// TODO detail mode
 	}
+}
+
+var pcFileLineMaps = pcFileLineMap{m: map[uintptr]fileLine{}}
+
+type fileLine struct {
+	file string
+	line int
+}
+
+type pcFileLineMap struct {
+	sync.RWMutex
+	m map[uintptr]fileLine
+}
+
+func (p *pcFileLineMap) getFileLine() (file string, line int) {
+	var rpc [5]uintptr
+	runtime.Callers(0, rpc[:])
+
+	p.RLock()
+	v, ok := p.m[rpc[4]]
+	p.RUnlock()
+
+	if ok {
+		return v.file, v.line
+	}
+
+	var pc uintptr
+	pc, file, line, ok = runtime.Caller(3)
+	if !ok {
+		file = "???"
+		line = 0
+	}
+
+	fileLine := fileLine{file, line}
+	p.Lock()
+	p.m[pc] = fileLine
+	p.Unlock()
+	return
 }

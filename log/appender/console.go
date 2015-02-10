@@ -2,42 +2,43 @@ package appender
 
 import (
 	"github.com/tbud/x/config"
+	"github.com/tbud/x/log/common"
+	"github.com/tbud/x/log/layout"
 	"io"
 	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
-	"text/template"
-	"time"
 )
 
 type ConsoleAppender struct {
 	sync.Mutex
-	out   io.Writer
-	templ *template.Template
+	out      io.Writer
+	layout   layout.Layout
+	buf      []byte
+	needFile bool
+	needTime bool
 }
 
-func (c *ConsoleAppender) Append(m *LogMsg) error {
-	// return c.templ.Execute(c.out, m)
-	msg := m.Date.Format("060102 15:04:05.000") + m.Msg
+func (c *ConsoleAppender) Append(m *common.LogMsg) (err error) {
+	err = nil
 	c.Lock()
-	c.out.Write([]byte(msg))
+	c.buf = c.buf[:0]
+	err = c.layout.Format(&c.buf, m)
+	c.out.Write(c.buf)
 	c.Unlock()
-	return nil
+	return
 }
 
-func fdate(layout string, date *time.Time) string {
-	if date == nil {
-		return ""
-	}
-	return date.Format(layout)
+func (c *ConsoleAppender) NeedFile() bool {
+	return c.needFile
+}
+
+func (c *ConsoleAppender) NeedTime() bool {
+	return c.needTime
 }
 
 func consoleAppender(conf *config.Config) (app Appender, err error) {
-	if conf == nil {
-		conf = &config.Config{}
-	}
-
 	appender := &ConsoleAppender{}
 	switch strings.ToLower(conf.StringDefault("target", "stdout")) {
 	default:
@@ -48,14 +49,12 @@ func consoleAppender(conf *config.Config) (app Appender, err error) {
 		appender.out = ioutil.Discard
 	}
 
-	funcMap := template.FuncMap{
-		"fdate": fdate,
-	}
-
-	templ := conf.StringDefault("pattern", "{{.Date|fdate \"060102 15:04:05.000000\"}} - {{.Msg}}") + "\n"
-	if appender.templ, err = template.New("Console").Funcs(funcMap).Parse(templ); err != nil {
+	if appender.layout, err = layout.New(conf.SubConfig("layout")); err != nil {
 		return nil, err
 	}
+
+	appender.needFile = appender.layout.NeedFile()
+	appender.needTime = appender.layout.NeedTime()
 
 	return appender, nil
 }
