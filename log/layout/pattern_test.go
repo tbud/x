@@ -13,7 +13,7 @@ func TestPatternFormat(t *testing.T) {
 		t.Error(err)
 	}
 
-	pattern, err := patternLayout(conf)
+	pattern, err := New(conf)
 	if err != nil {
 		t.Error(err)
 	}

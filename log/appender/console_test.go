@@ -24,7 +24,7 @@ func init() {
 
 	confInited = conf
 
-	appender, err := consoleAppender(confInited)
+	appender, err := New(confInited)
 	if err != nil {
 		return
 	}
@@ -81,7 +81,7 @@ func BenchmarkTimeFormat(b *testing.B) {
 }
 
 func TestConsole(t *testing.T) {
-	appender, err := consoleAppender(nil)
+	appender, err := New(nil)
 	if err != nil {
 		t.Error(err)
 	}
