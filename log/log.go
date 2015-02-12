@@ -80,7 +80,7 @@ func (l *Logger) Trace(format string, v ...interface{}) {
 
 func (l *Logger) initRoot(conf *config.Config) error {
 	l.fastMode = conf.BoolDefault("fastmode", true)
-	l.level = LogStringToLevel(conf.StringDefault("level", "error"))
+	l.level = LogStringToLevel(conf.StringDefault("level", "info"))
 
 	appenderRefs := conf.StringsDefault("appendrefs", []string{"console"})
 	for _, appenderRef := range appenderRefs {

@@ -257,7 +257,7 @@ func itoa(buf *[]byte, i int, wid int) {
 
 func patternLayout(conf *config.Config) (lay Layout, err error) {
 	layout := &PatternLayout{}
-	layout.pattern = []byte(conf.StringDefault("pattern", "[%l]%d{HH:mm:ss,SSSS} %m"))
+	layout.pattern = []byte(conf.StringDefault("pattern", "[%l]%m"))
 	err = layout.parse()
 	return layout, err
 }
