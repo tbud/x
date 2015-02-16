@@ -7,11 +7,9 @@ import (
 	"strings"
 )
 
-type Config struct {
-	options map[string]interface{}
-}
+type Config map[string]interface{}
 
-func Load(fileName string) (config *Config, err error) {
+func Load(fileName string) (config Config, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if _, ok := r.(runtime.Error); ok {
@@ -21,7 +19,7 @@ func Load(fileName string) (config *Config, err error) {
 		}
 	}()
 
-	config = &Config{map[string]interface{}{}}
+	config = Config{}
 	scan := fileScanner{}
 
 	if !filepath.IsAbs(fileName) {
@@ -36,11 +34,11 @@ func Load(fileName string) (config *Config, err error) {
 		return
 	}
 
-	err = scan.setOptions(config.options)
+	err = scan.setOptions(config)
 	return
 }
 
-func (c *Config) Int(key string) (result int, found bool) {
+func (c Config) Int(key string) (result int, found bool) {
 	result, found = 0, false
 	value := c.getValue(key)
 	if value == nil {
@@ -50,10 +48,11 @@ func (c *Config) Int(key string) (result int, found bool) {
 	if retFloat, ok := value.(float64); ok {
 		return int(retFloat), ok
 	}
+	result, found = value.(int)
 	return
 }
 
-func (c *Config) IntDefault(key string, defaultValue int) int {
+func (c Config) IntDefault(key string, defaultValue int) int {
 	result, found := c.Int(key)
 	if !found {
 		result = defaultValue
@@ -61,7 +60,7 @@ func (c *Config) IntDefault(key string, defaultValue int) int {
 	return result
 }
 
-func (c *Config) Float(key string) (result float64, found bool) {
+func (c Config) Float(key string) (result float64, found bool) {
 	result, found = 0.0, false
 	value := c.getValue(key)
 	if value == nil {
@@ -72,7 +71,7 @@ func (c *Config) Float(key string) (result float64, found bool) {
 	return
 }
 
-func (c *Config) FloatDefault(key string, defaultValue float64) float64 {
+func (c Config) FloatDefault(key string, defaultValue float64) float64 {
 	result, found := c.Float(key)
 	if !found {
 		result = defaultValue
@@ -80,7 +79,7 @@ func (c *Config) FloatDefault(key string, defaultValue float64) float64 {
 	return result
 }
 
-func (c *Config) String(key string) (result string, found bool) {
+func (c Config) String(key string) (result string, found bool) {
 	result, found = "", false
 	value := c.getValue(key)
 	if value == nil {
@@ -91,7 +90,7 @@ func (c *Config) String(key string) (result string, found bool) {
 	return
 }
 
-func (c *Config) StringDefault(key, defaultValue string) string {
+func (c Config) StringDefault(key, defaultValue string) string {
 	result, found := c.String(key)
 	if !found {
 		result = defaultValue
@@ -99,7 +98,7 @@ func (c *Config) StringDefault(key, defaultValue string) string {
 	return result
 }
 
-func (c *Config) Bool(key string) (result, found bool) {
+func (c Config) Bool(key string) (result, found bool) {
 	result, found = false, false
 	value := c.getValue(key)
 	if value == nil {
@@ -110,7 +109,7 @@ func (c *Config) Bool(key string) (result, found bool) {
 	return
 }
 
-func (c *Config) BoolDefault(key string, defaultValue bool) bool {
+func (c Config) BoolDefault(key string, defaultValue bool) bool {
 	result, found := c.Bool(key)
 	if !found {
 		result = defaultValue
@@ -118,7 +117,7 @@ func (c *Config) BoolDefault(key string, defaultValue bool) bool {
 	return result
 }
 
-func (c *Config) Strings(key string) (result []string, found bool) {
+func (c Config) Strings(key string) (result []string, found bool) {
 	result, found = []string{}, false
 	value := c.getValue(key)
 	if value == nil {
@@ -132,11 +131,14 @@ func (c *Config) Strings(key string) (result []string, found bool) {
 				result = append(result, v)
 			}
 		}
+		return
 	}
+
+	result, found = value.([]string)
 	return
 }
 
-func (c *Config) StringsDefault(key string, defaultValue []string) []string {
+func (c Config) StringsDefault(key string, defaultValue []string) []string {
 	result, found := c.Strings(key)
 	if !found {
 		result = defaultValue
@@ -144,25 +146,28 @@ func (c *Config) StringsDefault(key string, defaultValue []string) []string {
 	return result
 }
 
-func subConfig(value interface{}) *Config {
+func subConfig(value interface{}) Config {
 	if value != nil {
 		if v, ok := value.(map[string]interface{}); ok {
-			return &Config{v}
+			return Config(v)
+		}
+		if v, ok := value.(Config); ok {
+			return v
 		}
 	}
 	return nil
 }
 
-func (c *Config) SubConfig(key string) *Config {
+func (c Config) SubConfig(key string) Config {
 	result := c.getValue(key)
 	return subConfig(result)
 }
 
-func (c *Config) EachSubConfig(fun func(key string, conf *Config) error) error {
+func (c Config) EachSubConfig(fun func(key string, conf Config) error) error {
 	if c == nil {
 		return errors.New("Config is nil")
 	}
-	for key, value := range c.options {
+	for key, value := range c {
 		err := fun(key, subConfig(value))
 		if err != nil {
 			return err
@@ -171,18 +176,18 @@ func (c *Config) EachSubConfig(fun func(key string, conf *Config) error) error {
 	return nil
 }
 
-func (c *Config) KeyLen() int {
+func (c Config) KeyLen() int {
 	if c == nil {
 		return 0
 	}
-	return len(c.options)
+	return len(c)
 }
 
-func (c *Config) getValue(key string) interface{} {
+func (c Config) getValue(key string) interface{} {
 	if len(key) == 0 || c == nil {
 		return nil
 	}
-	ops := c.options
+	ops := c
 
 	keys := strings.Split(key, ".")
 	lastkeyIndex := len(keys) - 1
@@ -191,9 +196,13 @@ func (c *Config) getValue(key string) interface{} {
 			if i == lastkeyIndex {
 				return value
 			} else {
-				if ops, ok = value.(map[string]interface{}); !ok {
-					return nil
+				if ops, ok = value.(map[string]interface{}); ok {
+					continue
 				}
+				if ops, ok = value.(Config); ok {
+					continue
+				}
+				return nil
 			}
 		} else {
 			return nil

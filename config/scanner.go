@@ -155,16 +155,16 @@ func (s *fileScanner) checkValid(fileName string) error {
 	return nil
 }
 
-func (s *fileScanner) setOptions(options map[string]interface{}) error {
+func (s *fileScanner) setOptions(config Config) error {
 	for _, kv := range s.kvs {
-		ops := options
+		ops := config
 		for i := 0; i < len(kv.keys)-1; i++ {
 			key := kv.keys[i]
 			if optMap, ok := ops[key]; ok {
 				if v, ok := optMap.(map[string]interface{}); ok {
 					ops = v
 				} else {
-					return &SyntaxError{"set options value error, key " + key + " is not a map[string]interface{}", []byte{}, int64(i)}
+					return &SyntaxError{"set config value error, key " + key + " is not a map[string]interface{}", []byte{}, int64(i)}
 				}
 			} else {
 				ops[key] = map[string]interface{}{}

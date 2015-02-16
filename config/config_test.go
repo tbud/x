@@ -30,8 +30,8 @@ func compareJsonAndConfig(t *testing.T, jsonFile string, confFile string) {
 		t.Error(err)
 	}
 
-	if !reflect.DeepEqual(json, conf.options) {
-		t.Errorf("\nwant %v\n got %v", json, conf.options)
+	if !reflect.DeepEqual(Config(json.(map[string]interface{})), conf) {
+		t.Errorf("\nwant %v\n got %v", json, conf)
 	}
 }
 
@@ -106,7 +106,7 @@ func TestConfigGetFloat(t *testing.T) {
 
 	// test get ok
 	if get, ok := conf.Float("test1.cover.fnum"); !ok || get != 12.58 {
-		t.Errorf("get test1.num float value, want 12.58 get %d, %v", get, ok)
+		t.Errorf("get test1.cover.fnum float value, want 12.58 get %d, %v", get, ok)
 	}
 
 	// test get error
@@ -138,12 +138,12 @@ func TestConfigGetString(t *testing.T) {
 
 	// test get ok
 	if get, ok := conf.String("test1.comment"); !ok || get != "#" {
-		t.Errorf("get test1.num string value, want '#' get %s, %v", get, ok)
+		t.Errorf("get test1.comment string value, want '#' get %s, %v", get, ok)
 	}
 
 	// test get error
 	if get, ok := conf.String("test1.comment1"); ok || get != "" {
-		t.Error("get test1.num1 string value, not error")
+		t.Error("get test1.comment1 string value, not error")
 	}
 }
 
@@ -170,12 +170,12 @@ func TestConfigGetStrings(t *testing.T) {
 
 	// test get ok
 	if get, ok := conf.Strings("test2.mylist"); !ok || !reflect.DeepEqual(get, []string{"1", "2", "3"}) {
-		t.Errorf("get test1.num strings value, want [1,2,3] get %s, %v", get, ok)
+		t.Errorf("get test2.mylist strings value, want [1,2,3] get %s, %v", get, ok)
 	}
 
 	// test get error
 	if get, ok := conf.Strings("test2.mylist1"); ok || !reflect.DeepEqual(get, []string{}) {
-		t.Error("get test1.num1 strings value, not error")
+		t.Error("get test2.mylist1 strings value, not error")
 	}
 }
 
@@ -202,12 +202,12 @@ func TestConfigGetBool(t *testing.T) {
 
 	// test get ok
 	if get, ok := conf.Bool("test1.ok"); !ok || get != true {
-		t.Errorf("get test1.num bool value, want true get %v, %v", get, ok)
+		t.Errorf("get test1.ok bool value, want true get %v, %v", get, ok)
 	}
 
 	// test get error
 	if get, ok := conf.Bool("test1.ok1"); ok || get != false {
-		t.Error("get test1.num1 bool value, not error")
+		t.Error("get test1.ok1 bool value, not error")
 	}
 }
 
@@ -272,7 +272,7 @@ func TestConfigEachAndKeyLen(t *testing.T) {
 	subConf := conf.SubConfig("test3.nums")
 
 	if subConf.KeyLen() > 0 {
-		err := subConf.EachSubConfig(func(key string, conf *Config) error {
+		err := subConf.EachSubConfig(func(key string, conf Config) error {
 			if !strings.HasPrefix(key, "num") {
 				return errors.New("unaccept key in each config test: " + key)
 			}
@@ -285,5 +285,4 @@ func TestConfigEachAndKeyLen(t *testing.T) {
 	} else {
 		t.Error("load file error")
 	}
-
 }
