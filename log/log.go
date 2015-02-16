@@ -20,7 +20,7 @@ type Logger struct {
 	needTime      bool
 }
 
-func New(conf *config.Config) (*Logger, error) {
+func New(conf config.Config) (*Logger, error) {
 	logger := Logger{appenders: map[string]appender.Appender{}}
 
 	err := logger.loadAppenders(conf.SubConfig("appender"))
@@ -78,7 +78,7 @@ func (l *Logger) Trace(format string, v ...interface{}) {
 	}
 }
 
-func (l *Logger) initRoot(conf *config.Config) error {
+func (l *Logger) initRoot(conf config.Config) error {
 	l.fastMode = conf.BoolDefault("fastmode", true)
 	l.level = LogStringToLevel(conf.StringDefault("level", "info"))
 
@@ -102,7 +102,7 @@ func (l *Logger) initRoot(conf *config.Config) error {
 	return nil
 }
 
-func (l *Logger) loadAppenders(conf *config.Config) error {
+func (l *Logger) loadAppenders(conf config.Config) error {
 	if conf == nil || conf.KeyLen() == 0 {
 		appender, err := appender.New(nil)
 		if err != nil {
@@ -111,7 +111,7 @@ func (l *Logger) loadAppenders(conf *config.Config) error {
 
 		l.appenders["console"] = appender
 	} else {
-		return conf.EachSubConfig(func(key string, subConf *config.Config) error {
+		return conf.EachSubConfig(func(key string, subConf config.Config) error {
 			appender, err := appender.New(subConf)
 			if err != nil {
 				return errors.New("Load appender " + key + " error: " + err.Error())

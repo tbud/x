@@ -12,7 +12,7 @@ type Appender interface {
 	NeedTime() bool
 }
 
-type AppenderMaker func(conf *config.Config) (Appender, error)
+type AppenderMaker func(conf config.Config) (Appender, error)
 
 var appenderMakers = make(map[string]AppenderMaker)
 
@@ -29,7 +29,7 @@ func Register(name string, appenderMaker AppenderMaker) {
 	appenderMakers[name] = appenderMaker
 }
 
-func New(conf *config.Config) (appender Appender, err error) {
+func New(conf config.Config) (appender Appender, err error) {
 	name := conf.StringDefault("type", "Console")
 	if appenderMaker, ok := appenderMakers[name]; ok {
 		appender, err = appenderMaker(conf)

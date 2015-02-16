@@ -38,7 +38,7 @@ func (c *ConsoleAppender) NeedTime() bool {
 	return c.needTime
 }
 
-func consoleAppender(conf *config.Config) (app Appender, err error) {
+func consoleAppender(conf config.Config) (app Appender, err error) {
 	appender := &ConsoleAppender{}
 	switch strings.ToLower(conf.StringDefault("target", "stdout")) {
 	default:

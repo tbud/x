@@ -12,7 +12,7 @@ type Layout interface {
 	NeedTime() bool
 }
 
-type LayoutMaker func(conf *config.Config) (Layout, error)
+type LayoutMaker func(conf config.Config) (Layout, error)
 
 var layoutMakers = make(map[string]LayoutMaker)
 
@@ -29,7 +29,7 @@ func Register(name string, layoutMaker LayoutMaker) {
 	layoutMakers[name] = layoutMaker
 }
 
-func New(conf *config.Config) (layout Layout, err error) {
+func New(conf config.Config) (layout Layout, err error) {
 	name := conf.StringDefault("type", "Pattern")
 	if layoutMaker, ok := layoutMakers[name]; ok {
 		layout, err = layoutMaker(conf)

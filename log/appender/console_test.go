@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	confInited     *config.Config
+	confInited     config.Config
 	appenderInited Appender
 	msgInited      = common.LogMsg{Msg: "hello py", Date: time.Now()}
 )

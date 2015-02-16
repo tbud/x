@@ -255,7 +255,7 @@ func itoa(buf *[]byte, i int, wid int) {
 	*buf = append(*buf, b[bp:]...)
 }
 
-func patternLayout(conf *config.Config) (lay Layout, err error) {
+func patternLayout(conf config.Config) (lay Layout, err error) {
 	layout := &PatternLayout{}
 	layout.pattern = []byte(conf.StringDefault("pattern", "[%l]%m"))
 	err = layout.parse()
