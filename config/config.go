@@ -176,11 +176,70 @@ func (c Config) EachSubConfig(fun func(key string, conf Config) error) error {
 	return nil
 }
 
+func (c Config) EachKey(fun func(key string) error) error {
+	if c == nil {
+		return errors.New("Config is nil")
+	}
+	for key, _ := range c {
+		err := fun(key)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (c Config) KeyLen() int {
 	if c == nil {
 		return 0
 	}
 	return len(c)
+}
+
+func (c Config) Merge(key string, value interface{}) error {
+	if len(key) == 0 || c == nil {
+		return nil
+	}
+	ops := c
+
+	keys := strings.Split(key, ".")
+	lastKeyIndex := len(keys) - 1
+
+	for i, k := range keys {
+		if i == lastKeyIndex {
+			switch val := value.(type) {
+			case int, string, bool, float64, []string:
+				ops[k] = val
+			case map[string]interface{}, Config:
+				tmpOps := ops.SubConfig(k)
+				if tmpOps == nil {
+					ops[k] = Config{}
+					ops, _ = ops[k].(Config)
+				} else {
+					ops = tmpOps
+				}
+
+				var conf Config
+				var ok bool
+				if conf, ok = value.(Config); !ok {
+					conf, _ = value.(map[string]interface{})
+				}
+
+				return conf.EachKey(func(key string) error {
+					return ops.Merge(key, conf.getValue(key))
+				})
+			}
+		} else {
+			tmpOps := ops.SubConfig(k)
+			if tmpOps == nil {
+				ops[k] = Config{}
+				ops, _ = ops[k].(Config)
+			} else {
+				ops = tmpOps
+			}
+		}
+	}
+	return nil
 }
 
 func (c Config) getValue(key string) interface{} {

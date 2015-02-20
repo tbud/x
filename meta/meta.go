@@ -10,6 +10,7 @@ import (
 
 type MetaInfo struct {
 	Name          string
+	OriginName    string
 	Tagged        bool
 	Min           int
 	Max           int
@@ -146,6 +147,7 @@ func meta(t reflect.Type, tagName string) (retMeta []MetaInfo, err error) {
 			}
 			if len(ms[i].Name) == 0 && (!sf.Anonymous || ft.Kind() != reflect.Struct) {
 				ms[i].Name = nameStrategy[tagName](t.Field(i).Name)
+				ms[i].OriginName = t.Field(i).Name
 			}
 		}
 
