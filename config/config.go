@@ -197,11 +197,14 @@ func (c Config) KeyLen() int {
 }
 
 func (c Config) Merge(key string, value interface{}) error {
-	if len(key) == 0 || c == nil {
-		return nil
+	if c == nil {
+		return errors.New("Config is nil")
 	}
-	ops := c
+	if len(key) == 0 {
+		return c.mergeConf(value)
+	}
 
+	ops := c
 	keys := strings.Split(key, ".")
 	lastKeyIndex := len(keys) - 1
 
@@ -211,35 +214,40 @@ func (c Config) Merge(key string, value interface{}) error {
 			case int, string, bool, float64, []string:
 				ops[k] = val
 			case map[string]interface{}, Config:
-				tmpOps := ops.SubConfig(k)
-				if tmpOps == nil {
-					ops[k] = Config{}
-					ops, _ = ops[k].(Config)
-				} else {
-					ops = tmpOps
-				}
+				ops = ops.subAndCreateConfig(k)
 
-				var conf Config
-				var ok bool
-				if conf, ok = value.(Config); !ok {
-					conf, _ = value.(map[string]interface{})
-				}
-
-				return conf.EachKey(func(key string) error {
-					return ops.Merge(key, conf.getValue(key))
-				})
+				return ops.mergeConf(value)
 			}
 		} else {
-			tmpOps := ops.SubConfig(k)
-			if tmpOps == nil {
-				ops[k] = Config{}
-				ops, _ = ops[k].(Config)
-			} else {
-				ops = tmpOps
-			}
+			ops = ops.subAndCreateConfig(k)
 		}
 	}
 	return nil
+}
+
+func (c Config) subAndCreateConfig(key string) (ops Config) {
+	tmpOps := c.SubConfig(key)
+	if tmpOps == nil {
+		c[key] = Config{}
+		ops, _ = c[key].(Config)
+	} else {
+		ops = tmpOps
+	}
+	return
+}
+
+func (c Config) mergeConf(src interface{}) error {
+	var conf Config
+	var ok bool
+	if conf, ok = src.(Config); !ok {
+		if conf, ok = src.(map[string]interface{}); !ok {
+			return nil
+		}
+	}
+
+	return conf.EachKey(func(key string) error {
+		return c.Merge(key, conf.getValue(key))
+	})
 }
 
 func (c Config) getValue(key string) interface{} {

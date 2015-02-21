@@ -93,3 +93,22 @@ func TestMergeConfig(t *testing.T) {
 		t.Errorf("get test1.list.strlist string list value, want [11, 22, 33] get %v, %v", get, ok)
 	}
 }
+
+func TestMergeRootConfig(t *testing.T) {
+	mergeConf.Merge("", Config{
+		"test2": Config{
+			"mylist1": []string{"11", "12", "13"},
+		},
+	})
+
+	if get, ok := mergeConf.Strings("test2.mylist1"); !ok || !reflect.DeepEqual(get, []string{"11", "12", "13"}) {
+		t.Errorf("get test2.mylist1 string list value, want [11, 12, 13] get %v, %v", get, ok)
+	}
+}
+
+func TestMergeCoverage(t *testing.T) {
+	err := mergeConf.Merge("", true)
+	if err != nil {
+		t.Error(err)
+	}
+}

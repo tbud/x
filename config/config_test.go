@@ -93,7 +93,7 @@ func TestConfigGetIntDefault(t *testing.T) {
 		t.Error("get int default error")
 	}
 
-	if conf.IntDefault("test1.num1", 5) != 5 {
+	if conf.IntDefault("test1.num.num1", 5) != 5 {
 		t.Error("get int default error")
 	}
 }
