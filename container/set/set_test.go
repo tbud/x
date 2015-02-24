@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func T1estSetAddHas(t *testing.T) {
+func TestSetAddHas(t *testing.T) {
 	s := New()
 	if s.Has("abc") != false {
 		t.Error("empty set has a item must return false")
@@ -19,7 +19,7 @@ func T1estSetAddHas(t *testing.T) {
 	}
 }
 
-func T1estSetRemove(t *testing.T) {
+func TestSetRemove(t *testing.T) {
 	s := New()
 
 	s.Add("abc")

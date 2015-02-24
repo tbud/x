@@ -12,11 +12,13 @@ func NewIntSet(items ...int) IntSet {
 	return s
 }
 
-func (s IntSet) Add(item int) IntSet {
+func (s IntSet) Add(item interface{}) IntSet {
 	if s == nil {
 		return s
 	}
 
-	s[item] = true
+	it, _ := item.(int)
+
+	s[it] = true
 	return s
 }

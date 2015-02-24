@@ -37,6 +37,41 @@ func (s StringSet) Remove(item string) StringSet {
 	return s
 }
 
+func (s StringSet) Union(items ...string) StringSet {
+	if s != nil && len(items) > 0 {
+		for _, item := range items {
+			s.Add(item)
+		}
+	}
+	return s
+}
+
+func (s StringSet) Subtract(items ...string) StringSet {
+	if s != nil && len(items) > 0 {
+		for _, item := range items {
+			s.Remove(item)
+		}
+	}
+	return s
+}
+
+func (s StringSet) ForEach(fun func(value string) error) error {
+	for k, _ := range s {
+		err := fun(k)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s StringSet) ToSeq() (ret []string) {
+	for k, _ := range s {
+		ret = append(ret, k)
+	}
+	return
+}
+
 func (s StringSet) Len() int {
 	if s == nil {
 		return 0
