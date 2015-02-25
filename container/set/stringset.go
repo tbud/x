@@ -55,7 +55,7 @@ func (s StringSet) Subtract(items ...string) StringSet {
 	return s
 }
 
-func (s StringSet) ForEach(fun func(value string) error) error {
+func (s StringSet) ForEach(fun func(item string) error) error {
 	for k, _ := range s {
 		err := fun(k)
 		if err != nil {

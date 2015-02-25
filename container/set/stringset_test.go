@@ -75,6 +75,17 @@ func TestStringSetUnion(t *testing.T) {
 	}
 }
 
+func TestStringSetSubtract(t *testing.T) {
+	s := NewStringSet("1", "2", "3")
+	s1 := NewStringSet("1", "3", "5")
+
+	s.Subtract(s1.ToSeq()...)
+	want := NewStringSet("2")
+	if !reflect.DeepEqual(s, want) {
+		t.Errorf("string set error, want:%v, got:%v", want, s)
+	}
+}
+
 func BenchmarkStringSetAdd(b *testing.B) {
 	s := NewStringSet()
 	for i := 0; i < b.N; i++ {
