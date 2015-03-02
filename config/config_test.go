@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/tbud/x/encoding/json"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -67,7 +68,7 @@ func TestScannerError(t *testing.T) {
 }
 
 func TestConfigGetInt(t *testing.T) {
-	conf, err := Load("testdata/multifile.conf")
+	conf, err := useReadGetConfig("testdata/singlefile.conf")
 	if err != nil {
 		t.Error(err)
 	}
@@ -285,4 +286,19 @@ func TestConfigEachAndKeyLen(t *testing.T) {
 	} else {
 		t.Error("load file error")
 	}
+}
+
+func useReadGetConfig(fileName string) (conf Config, err error) {
+	reader, err := os.Open(fileName)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	conf, err = Read(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	return conf, nil
 }

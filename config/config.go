@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"io"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -30,6 +31,28 @@ func Load(fileName string) (config Config, err error) {
 	}
 
 	err = scan.checkValid(fileName)
+	if err != nil {
+		return
+	}
+
+	err = scan.setOptions(config)
+	return
+}
+
+func Read(reader io.Reader) (config Config, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if _, ok := r.(runtime.Error); ok {
+				panic(r)
+			}
+			err = r.(error)
+		}
+	}()
+
+	config = Config{}
+	scan := fileScanner{}
+
+	err = scan.checkReaderValid(reader)
 	if err != nil {
 		return
 	}

@@ -10,7 +10,9 @@ package config
 // before diving into the scanner itself.
 
 import (
+	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -123,20 +125,30 @@ func (s *fileScanner) init() {
 
 // checkValid verifies that data is valid HOCON-encoded data.
 // scan is passed in for use by checkValid to avoid an allocation.
-func (s *fileScanner) checkValid(fileName string) error {
-	s.init()
-
+func (s *fileScanner) checkValid(fileName string) (err error) {
 	if !filepath.IsAbs(fileName) {
 		return s.errorSyntax("file '" + fileName + "' is not absolute path")
-	}
-	var err error
-	s.data, err = ioutil.ReadFile(fileName)
-	if err != nil {
-		return s.errorSyntax(err.Error())
 	}
 
 	s.file = filepath.Base(fileName)
 	s.dir = filepath.Dir(fileName)
+
+	var reader io.ReadWriteCloser
+	if reader, err = os.Open(fileName); err == nil {
+		defer reader.Close()
+		return s.checkReaderValid(reader)
+	}
+
+	return
+}
+
+func (s *fileScanner) checkReaderValid(reader io.Reader) (err error) {
+	s.init()
+
+	s.data, err = ioutil.ReadAll(reader)
+	if err != nil {
+		return s.errorSyntax(err.Error())
+	}
 
 	for _, c := range s.data {
 		s.bytes++
@@ -151,7 +163,6 @@ func (s *fileScanner) checkValid(fileName string) error {
 	if s.step(s, '\n') == scanError {
 		return s.err
 	}
-
 	return nil
 }
 
