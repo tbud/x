@@ -37,43 +37,43 @@ func New(conf config.Config) (*Logger, error) {
 }
 
 func (l *Logger) SetLevel(level int) {
-	if level >= LevelFatal && level <= LevelTrace {
+	if l != nil && level >= LevelFatal && level <= LevelTrace {
 		l.level = level
 	}
 }
 
 func (l *Logger) Fatal(format string, v ...interface{}) {
-	if l.level >= LevelFatal {
+	if l != nil && l.level >= LevelFatal {
 		l.output(LevelFatal, format, v...)
 	}
 }
 
 func (l *Logger) Error(format string, v ...interface{}) {
-	if l.level >= LevelError {
+	if l != nil && l.level >= LevelError {
 		l.output(LevelError, format, v...)
 	}
 }
 
 func (l *Logger) Warn(format string, v ...interface{}) {
-	if l.level >= LevelWarn {
+	if l != nil && l.level >= LevelWarn {
 		l.output(LevelWarn, format, v...)
 	}
 }
 
 func (l *Logger) Info(format string, v ...interface{}) {
-	if l.level >= LevelInfo {
+	if l != nil && l.level >= LevelInfo {
 		l.output(LevelInfo, format, v...)
 	}
 }
 
 func (l *Logger) Debug(format string, v ...interface{}) {
-	if l.level >= LevelDebug {
+	if l != nil && l.level >= LevelDebug {
 		l.output(LevelDebug, format, v...)
 	}
 }
 
 func (l *Logger) Trace(format string, v ...interface{}) {
-	if l.level >= LevelTrace {
+	if l != nil && l.level >= LevelTrace {
 		l.output(LevelTrace, format, v...)
 	}
 }

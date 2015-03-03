@@ -51,3 +51,14 @@ func TestDebug(t *testing.T) {
 		logger.Error("py test console")
 	}
 }
+
+func TestNilLog(t *testing.T) {
+	var log *Logger
+	log.SetLevel(0)
+	log.Fatal("fatal")
+	log.Error("error")
+	log.Warn("warn")
+	log.Info("info")
+	log.Debug("debug")
+	log.Trace("trace")
+}
