@@ -4,8 +4,10 @@ import (
 	"errors"
 	"io"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
+	"unicode"
 )
 
 type Config map[string]interface{}
@@ -246,6 +248,56 @@ func (c Config) Merge(key string, value interface{}) error {
 		}
 	}
 	return nil
+}
+
+func (c Config) SetStruct(v interface{}) error {
+	if c == nil || v == nil {
+		return nil
+	}
+
+	ev := reflect.ValueOf(v)
+	if ev.Kind() == reflect.Ptr {
+		ev = ev.Elem()
+	} else {
+		return errors.New("Struct must be a point.")
+	}
+
+	return c.EachKey(func(key string) error {
+		value := ev.FieldByName(firstRuneToUpper(key))
+		if value.IsValid() {
+			switch value.Kind() {
+			case reflect.Slice:
+				if value.Type() == reflect.TypeOf([]string{}) {
+					if ssv, ok := c.Strings(key); ok {
+						value.Set(reflect.ValueOf(ssv))
+					}
+				}
+			case reflect.Bool:
+				if bv, ok := c.Bool(key); ok {
+					value.SetBool(bv)
+				}
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				if iv, ok := c.Int(key); ok {
+					value.SetInt(int64(iv))
+				}
+			case reflect.String:
+				if sv, ok := c.String(key); ok {
+					value.SetString(sv)
+				}
+			case reflect.Float32, reflect.Float64:
+				if fv, ok := c.Float(key); ok {
+					value.SetFloat(fv)
+				}
+			}
+		}
+		return nil
+	})
+}
+
+func firstRuneToUpper(key string) string {
+	rkey := []rune(key)
+	rkey[0] = unicode.ToUpper(rkey[0])
+	return string(rkey)
 }
 
 func (c Config) subAndCreateConfig(key string) (ops Config) {
