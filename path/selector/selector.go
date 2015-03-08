@@ -48,7 +48,6 @@ func (s *Selector) Walk(root string, walkFn filepath.WalkFunc) error {
 			return err
 		}
 
-		// shortPath := path
 		shortPath := strings.TrimPrefix(path, root)
 		if len(shortPath) > 0 {
 			shortPath = shortPath[1:]
