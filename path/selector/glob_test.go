@@ -1,4 +1,4 @@
-package glob
+package selector
 
 import (
 	"errors"
@@ -7,13 +7,9 @@ import (
 )
 
 func TestGlobOptions(t *testing.T) {
-	glob, err := Parse("dh`abc")
+	glob, err := Parse("d`abc")
 	if err != nil {
 		t.Error(err)
-	}
-
-	if glob.incHide != true {
-		t.Error("glob must include hide file or dir")
 	}
 
 	if glob.incDir != true {
@@ -31,8 +27,7 @@ func TestGlobNoOptionSet(t *testing.T) {
 		t.Error(err)
 	}
 
-	if glob.incHide != false ||
-		glob.incDir != true ||
+	if glob.incDir != true ||
 		glob.incFile != true {
 		t.Error("default option error.")
 	}

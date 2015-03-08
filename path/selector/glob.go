@@ -1,4 +1,4 @@
-package glob
+package selector
 
 import (
 	"fmt"
@@ -14,17 +14,31 @@ type Glob struct {
 	regexp  *regexp.Regexp // save parsed match regexp
 	incDir  bool           // include dir
 	incFile bool           // include file
-	incHide bool           // include hiden file/dir
 	isNeg   bool           // negative regexp
 	debug   string
 }
 
-func Parse(pattern string) (g Glob, err error) {
-	g = Glob{pattern: pattern}
-	return g, g.Parse()
+func Parse(pattern string) (g *Glob, err error) {
+	g = &Glob{pattern: pattern}
+	return g, g.parse()
 }
 
-func (g *Glob) Parse() (err error) {
+func (g *Glob) Match(path string) bool {
+	if g.regexp == nil {
+		return false
+	}
+	return g.regexp.MatchString(path)
+}
+
+func (g *Glob) checkType(isDir bool) bool {
+	if (g.incDir && isDir) ||
+		(g.incFile && !isDir) {
+		return true
+	}
+	return false
+}
+
+func (g *Glob) parse() (err error) {
 	pattern := g.pattern
 	if strings.Contains(pattern, glob_option_split_char) {
 		splitedPattern := strings.Split(pattern, glob_option_split_char)
@@ -47,10 +61,6 @@ func (g *Glob) Parse() (err error) {
 	return g.parsePattern(pattern)
 }
 
-func (g *Glob) Match(path string) bool {
-	return g.regexp.MatchString(path)
-}
-
 func (g *Glob) String() string {
 	return g.pattern
 }
@@ -64,8 +74,6 @@ func (g *Glob) parseOptions(options string) error {
 			g.incDir = true
 		case 'f', 'F':
 			g.incFile = true
-		case 'h', 'H':
-			g.incHide = true
 		}
 	}
 
@@ -160,7 +168,6 @@ func (g *Glob) parsePattern(pattern string) (err error) {
 				return fmt.Errorf("Missing ']': %d", i+1)
 			}
 			regex = append(regex, ']')
-
 		case '{':
 			if inGroup {
 				return fmt.Errorf("Cannot nest groups :%d", i)
@@ -201,9 +208,9 @@ func (g *Glob) parsePattern(pattern string) (err error) {
 				regex = append(regex, []rune("[^/]")...)
 			}
 		default:
-			// if isRegexMeta(c) {
-			// 	regex = append(regex, '\\')
-			// }
+			if isRegexMeta(c) {
+				regex = append(regex, '\\')
+			}
 			regex = append(regex, c)
 		}
 	}
@@ -227,7 +234,8 @@ func next(patternRune []rune, i int, patternLen int) rune {
 }
 
 func isRegexMeta(r rune) bool {
-	return strings.Contains(".^$+{[]|()", string(r))
+	//return strings.Contains(".^$+{[]|()", string(r))
+	return strings.Contains(".^$+{[", string(r))
 }
 
 func isGlobMeta(r rune) bool {
