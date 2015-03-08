@@ -1,6 +1,7 @@
 package glob
 
 import (
+	"errors"
 	"regexp"
 	"testing"
 )
@@ -39,8 +40,8 @@ func TestGlobNoOptionSet(t *testing.T) {
 
 func TestRegexp(t *testing.T) {
 	// regex := regexp.MustCompile("^ab[[^/]&&[c]]$")
-	regex := regexp.MustCompile("^ab[c]$")
-	if regex.MatchString("abc") != true {
+	regex := regexp.MustCompile("^[]a]$")
+	if regex.MatchString("]") != true {
 		t.Errorf("abc must be matched.")
 	}
 }
@@ -49,6 +50,10 @@ type MatchTest struct {
 	pattern, s string
 	match      bool
 	err        error
+}
+
+var match1Tests = []MatchTest{
+	{"[\\]a]", "]", true, nil},
 }
 
 var matchTests = []MatchTest{
@@ -90,28 +95,55 @@ var matchTests = []MatchTest{
 	{"[\\-x]", "x", true, nil},
 	{"[\\-x]", "-", true, nil},
 	{"[\\-x]", "a", false, nil},
-	{"[]a]", "]", false, nil},
-	{"[-]", "-", false, nil},
-	{"[x-]", "x", false, nil},
-	{"[x-]", "-", false, nil},
+	{"[]a]", "]", true, nil},
+	{"[-]", "-", false, errors.New("error parsing regexp: missing closing ]: `[^]$`")},
+	{"[x-]", "x", true, nil},
+	{"[x-]", "-", true, nil},
 	{"[x-]", "z", false, nil},
 	{"[-x]", "x", false, nil},
-	{"[-x]", "-", false, nil},
-	{"[-x]", "a", false, nil},
-	{"\\", "a", false, nil},
-	{"[a-b-c]", "a", false, nil},
-	{"[", "a", false, nil},
-	{"[^", "a", false, nil},
-	{"[^bc", "a", false, nil},
-	{"a[", "a", false, nil},
-	{"a[", "ab", false, nil},
+	{"[-x]", "-", true, nil},
+	{"[-x]", "a", true, nil},
+	{"\\", "a", false, errors.New("No character to escape at index 1")},
+	{"[a-b-c]", "a", false, errors.New("Invalid range: 5")},
+	{"[", "a", false, errors.New("Missing ']': 1")},
+	{"[^", "a", false, errors.New("Missing ']': 2")},
+	{"[^bc", "a", false, errors.New("Missing ']': 4")},
+	{"a[", "a", false, errors.New("Missing ']': 2")},
+	{"a[", "ab", false, errors.New("Missing ']': 2")},
 	{"*x", "xxx", true, nil},
+	// double star
+	{"**", "xx/bb/cc", true, nil},
+	{"xx/**", "xx/bb/cc", true, nil},
+	{"xx/**", "xx/", true, nil},
+	{"test/a/*/(c|g)/./d", "test/a/b/c/./d", true, nil},
+
+	{"test/a/**/[cg]/../[cg]", "test/a/abcdef/g/../g", true, nil},
+	{"test/a/**/[cg]/../[cg]", "test/a/abcfed/g/../g", true, nil},
+	{"test/a/**/[cg]/../[cg]", "test/a/b/c/../c", true, nil},
+	{"test/a/**/[cg]/../[cg]", "test/a/c/../c", true, nil},
+	{"test/a/**/[cg]/../[cg]", "test/a/c/d/c/../c", true, nil},
+	{"test/a/**/[cg]/../[cg]", "test/a/symlink/a/b/c/../c", true, nil},
+
+	{"test/**/g", "test/a/abcdef/g", true, nil},
+	{"test/**/g", "test/a/abcfed/g", true, nil},
+
+	{"test/a/abc{fed,def}/g/h", "test/a/abcdef/g/h", true, nil},
+	{"test/a/abc{fed,def}/g/h", "test/a/abcfed/g/h", true, nil},
+
+	{"test/a/abc{fed/g,def}/**/", "test/a/abcdef/", true, nil},
+	{"test/a/abc{fed/g,def}/**/", "test/a/abcdef/g", true, nil},
+	{"test/a/abc{fed/g,def}/**/", "test/a/abcfed/g/", true, nil},
 }
 
 func TestMatch(t *testing.T) {
 	for _, tt := range matchTests {
 		if glob, err := Parse(tt.pattern); err != nil {
-			t.Errorf("Parse %s err: %v, ", tt.pattern, err)
+			if tt.err == nil {
+				t.Errorf("Parse %s err: %v", tt.pattern, err)
+			} else if err.Error() != tt.err.Error() {
+				t.Errorf("Parse %s. want err: %v, got err: %v", tt.pattern, tt.err, err)
+			}
+
 		} else {
 			if glob.Match(tt.s) != tt.match {
 				t.Errorf("Match %s and pattern is %s. want %v got %v: debug: %s", tt.s, tt.pattern, tt.match, !tt.match, glob.debug)

@@ -99,7 +99,7 @@ func (g *Glob) parsePattern(pattern string) (err error) {
 		switch c {
 		case '\\':
 			if i+1 == patternLen {
-				return fmt.Errorf("No character to escape at index %d", i)
+				return fmt.Errorf("No character to escape at index %d", i+1)
 			}
 			next := next(patternRune, i, patternLen)
 			i += 1
@@ -114,24 +114,11 @@ func (g *Glob) parsePattern(pattern string) (err error) {
 				regex = append(regex, c)
 			}
 		case '[':
-			if isWindows {
-				regex = append(regex, []rune("[[^\\\\]&&[")...)
-			} else {
-				regex = append(regex, []rune("[[^/]&&[")...)
-			}
-			if next(patternRune, i, patternLen) == '^' {
-				regex = append(regex, []rune("\\^")...)
+			regex = append(regex, c)
+			switch next(patternRune, i, patternLen) {
+			case '!', '-', '^':
+				regex = append(regex, '^')
 				i += 1
-			} else {
-				switch next(patternRune, i, patternLen) {
-				case '!':
-					regex = append(regex, '^')
-					i += 1
-				case '-':
-					regex = append(regex, '^')
-					i += 1
-				}
-
 			}
 
 			hasRangeStart := false
@@ -143,20 +130,19 @@ func (g *Glob) parsePattern(pattern string) (err error) {
 					break
 				}
 				if c == '/' || (isWindows && c == '\\') {
-					return fmt.Errorf("Explicit 'name separator' in class: %d", i)
+					return fmt.Errorf("Explicit 'name separator' in class: %d", i+1)
 				}
-				if c == '\\' || c == '[' || c == '&' && next(patternRune, i, patternLen) == '&' {
-					regex = append(regex, '\\')
-				}
+				// if c == '\\' || c == '[' || c == '&' && next(patternRune, i, patternLen) == '&' {
+				// 	regex = append(regex, '\\')
+				// }
 
 				regex = append(regex, c)
-
 				if c == '-' {
 					if !hasRangeStart {
-						return fmt.Errorf("Invalid range: %d", i)
+						return fmt.Errorf("Invalid range: %d", i+1)
 					}
-					i += 1
 					c = next(patternRune, i, patternLen)
+					i += 1
 					if c == 0 || c == ']' {
 						break
 					}
@@ -171,9 +157,9 @@ func (g *Glob) parsePattern(pattern string) (err error) {
 				}
 			}
 			if c != ']' {
-				return fmt.Errorf("Missing ']': %d", i)
+				return fmt.Errorf("Missing ']': %d", i+1)
 			}
-			regex = append(regex, []rune("]]")...)
+			regex = append(regex, ']')
 
 		case '{':
 			if inGroup {
@@ -197,6 +183,10 @@ func (g *Glob) parsePattern(pattern string) (err error) {
 		case '*':
 			if next(patternRune, i, patternLen) == '*' {
 				regex = append(regex, []rune(".*")...)
+				i += 1
+				if next(patternRune, i, patternLen) == '/' {
+					i += 1
+				}
 			} else {
 				if isWindows {
 					regex = append(regex, []rune("[^\\\\]*")...)
@@ -211,9 +201,9 @@ func (g *Glob) parsePattern(pattern string) (err error) {
 				regex = append(regex, []rune("[^/]")...)
 			}
 		default:
-			if isRegexMeta(c) {
-				regex = append(regex, '\\')
-			}
+			// if isRegexMeta(c) {
+			// 	regex = append(regex, '\\')
+			// }
 			regex = append(regex, c)
 		}
 	}
