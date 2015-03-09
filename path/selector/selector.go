@@ -42,7 +42,13 @@ func (s *Selector) Matches(root string) (matches []string, err error) {
 	return
 }
 
-func (s *Selector) Walk(root string, walkFn filepath.WalkFunc) error {
+func (s *Selector) Walk(root string, walkFn filepath.WalkFunc) (err error) {
+	if !filepath.IsAbs(root) {
+		if root, err = filepath.Abs(root); err != nil {
+			return err
+		}
+	}
+
 	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info == nil {
 			return err
