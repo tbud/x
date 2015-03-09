@@ -34,6 +34,42 @@ func New(patterns ...string) (selector *Selector, err error) {
 	return selector, nil
 }
 
+func (s *Selector) Match(root string, path string, isDir bool) (ret bool, err error) {
+	if !filepath.IsAbs(root) {
+		if root, err = filepath.Abs(root); err != nil {
+			return false, err
+		}
+	}
+
+	if !filepath.IsAbs(path) {
+		if path, err = filepath.Abs(path); err != nil {
+			return false, err
+		}
+	}
+
+	var shortPath string
+	if strings.HasPrefix(path, root) {
+		shortPath = strings.TrimPrefix(path, root)
+		if len(shortPath) > 0 {
+			shortPath = shortPath[1:]
+		}
+	}
+
+	for _, negGlob := range s.negGlobs {
+		if negGlob.Match(shortPath) && negGlob.checkType(isDir) {
+			return false, nil
+		}
+	}
+
+	for _, glob := range s.globs {
+		if glob.Match(shortPath) && glob.checkType(isDir) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func (s *Selector) Matches(root string) (matches []string, err error) {
 	err = s.Walk(root, func(path string, info os.FileInfo, err error) error {
 		matches = append(matches, path)
