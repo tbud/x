@@ -25,7 +25,24 @@ func (c *ConsoleAppender) Append(m *common.LogMsg) (err error) {
 	c.Lock()
 	c.buf = c.buf[:0]
 	err = c.layout.Format(&c.buf, m)
+	switch m.Level {
+	case common.LevelError, common.LevelFatal:
+		c.out.Write([]byte("\x1B[31m"))
+	case common.LevelWarn:
+		c.out.Write([]byte("\x1B[35m"))
+	case common.LevelInfo:
+		c.out.Write([]byte("\x1B[32m"))
+	}
+
 	c.out.Write(c.buf)
+
+	switch m.Level {
+	default:
+		c.out.Write([]byte("\x1B[39m"))
+	case common.LevelDebug, common.LevelTrace:
+		// ignore
+	}
+
 	c.Unlock()
 	return
 }
