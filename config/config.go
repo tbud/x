@@ -171,6 +171,35 @@ func (c Config) StringsDefault(key string, defaultValue []string) []string {
 	return result
 }
 
+func (c Config) Bools(key string) (result []bool, found bool) {
+	result, found = []bool{}, false
+	value := c.getValue(key)
+	if value == nil {
+		return
+	}
+
+	if infs, f := value.([]interface{}); f {
+		for _, inf := range infs {
+			if v, ok := inf.(bool); ok {
+				found = true
+				result = append(result, v)
+			}
+		}
+		return
+	}
+
+	result, found = value.([]bool)
+	return
+}
+
+func (c Config) BoolsDefault(key string, defaultValue []bool) []bool {
+	result, found := c.Bools(key)
+	if !found {
+		result = defaultValue
+	}
+	return result
+}
+
 func subConfig(value interface{}) Config {
 	if value != nil {
 		if v, ok := value.(map[string]interface{}); ok {
