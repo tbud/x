@@ -46,17 +46,29 @@ func (l *Logger) Fatal(format string, v ...interface{}) {
 	if l != nil && l.level >= LevelFatal {
 		l.output(LevelFatal, format, v...)
 	}
+
+	if l == nil {
+		fmt.Printf(format+"\n", v...)
+	}
 }
 
 func (l *Logger) Error(format string, v ...interface{}) {
 	if l != nil && l.level >= LevelError {
 		l.output(LevelError, format, v...)
 	}
+
+	if l == nil {
+		fmt.Printf(format+"\n", v...)
+	}
 }
 
 func (l *Logger) Warn(format string, v ...interface{}) {
 	if l != nil && l.level >= LevelWarn {
 		l.output(LevelWarn, format, v...)
+	}
+
+	if l == nil {
+		fmt.Printf(format+"\n", v...)
 	}
 }
 
