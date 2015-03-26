@@ -19,11 +19,11 @@ func TestLinkedmapGetAndIsExist(t *testing.T) {
 		t.Errorf("want nil, got %s", v)
 	}
 
-	if m.IsExist("bbb") != true {
+	if m.Has("bbb") != true {
 		t.Error("bbb must exist")
 	}
 
-	if m.IsExist("ttt") != false {
+	if m.Has("ttt") != false {
 		t.Error("ttt must not exist")
 	}
 

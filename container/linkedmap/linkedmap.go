@@ -49,7 +49,7 @@ func (l *LinkedMap) Remove(key interface{}) bool {
 	return true
 }
 
-func (l *LinkedMap) IsExist(key interface{}) (found bool) {
+func (l *LinkedMap) Has(key interface{}) (found bool) {
 	l.lock.RLock()
 	_, found = l.m[key]
 	l.lock.RUnlock()
