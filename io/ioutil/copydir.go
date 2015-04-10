@@ -10,6 +10,7 @@ import (
 type CopyFlags uint
 
 const (
+	FlagDefault  CopyFlags = 0         // default flag
 	FlagCopyHide CopyFlags = 1 << iota // if set this flag, whill copy hide dir ('.' prefix dir)
 )
 
