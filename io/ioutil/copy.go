@@ -67,6 +67,22 @@ func Copy(destDir, srcDir string, copyFlags CopyFlags, copyFilter CopyFilter) (e
 	})
 }
 
+func CopyFile(destFile, srcFile string) (err error) {
+	if destFile, err = filepath.Abs(destFile); err != nil {
+		return err
+	}
+
+	if srcFile, err = filepath.Abs(srcFile); err != nil {
+		return err
+	}
+
+	if err = os.MkdirAll(destFile, 0777); err != nil {
+		return err
+	}
+
+	return copyFile(destFile, srcFile)
+}
+
 func copyFile(destFile, srcFile string) (err error) {
 	var dst, src *os.File
 	if dst, err = os.Create(destFile); err != nil {
