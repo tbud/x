@@ -26,10 +26,12 @@ func Copy(destDir, srcDir string, copyFlags CopyFlags, copyFilter CopyFilter) (e
 	}
 
 	var srcInfo os.FileInfo
-	if srcInfo, err = os.Stat(srcDir); err != nil {
+	if srcInfo, err = os.Stat(srcDir); !os.IsNotExist(err) {
 		if err = os.MkdirAll(destDir, srcInfo.Mode()); err != nil {
 			return err
 		}
+	} else if err != nil {
+		return err
 	}
 
 	srcDirLen := len(srcDir)
